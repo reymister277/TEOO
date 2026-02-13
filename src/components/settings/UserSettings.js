@@ -3,7 +3,7 @@
 // ========================================
 
 import { getState, setState } from '../../utils/state.js';
-import { updateUserProfile, logout } from '../../services/auth.js';
+import { updateUserProfile, logout, changePassword } from '../../services/auth.js';
 import { AVATAR_EMOJIS } from '../../utils/helpers.js';
 
 export function renderSettings() {
@@ -195,14 +195,87 @@ function renderAccountTab() {
                 </div>
                 <div class="setting-row">
                     <div>
-                        <div class="setting-label">Hesap Oluşturma</div>
-                        <div class="setting-value">Firebase Auth ile yönetiliyor</div>
+                        <div class="setting-label">Arkadaş Kodu</div>
+                        <div class="setting-value" style="color: var(--accent-primary); font-weight: 700; letter-spacing: 2px;">#${user.friendCode || '...'}</div>
                     </div>
                 </div>
             </div>
         </div>
+
+        <div class="settings-section-title" style="margin-top: 24px;">Şifre Değiştir</div>
+        <div class="profile-card">
+            <div class="profile-card-body" style="padding-top: 24px;">
+                <div class="setting-row" style="flex-direction: column; align-items: stretch;">
+                    <input type="password" id="currentPassword" class="settings-input" placeholder="Mevcut şifre" autocomplete="current-password">
+                </div>
+                <div class="setting-row" style="flex-direction: column; align-items: stretch;">
+                    <input type="password" id="newPassword" class="settings-input" placeholder="Yeni şifre (en az 6 karakter)" autocomplete="new-password">
+                </div>
+                <div class="setting-row" style="flex-direction: column; align-items: stretch;">
+                    <input type="password" id="confirmPassword" class="settings-input" placeholder="Yeni şifre tekrar" autocomplete="new-password">
+                </div>
+                <div class="setting-row" style="gap: 10px;">
+                    <button class="settings-save-btn" id="changePasswordBtn">Şifreyi Değiştir</button>
+                    <div class="settings-status" id="passwordStatus"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-section-title" style="margin-top: 24px; color: var(--error);">Tehlikeli Bölge</div>
+        <div class="profile-card">
+            <div class="profile-card-body" style="padding-top: 16px;">
+                <div class="setting-row">
+                    <div>
+                        <div class="setting-label">Çıkış Yap</div>
+                        <div class="setting-value">Hesabından güvenli çıkış yap</div>
+                    </div>
+                    <button class="settings-danger-btn" id="logoutBtn">Çıkış</button>
+                </div>
+            </div>
+        </div>
     `;
+
+    // Şifre değiştirme
+    document.getElementById('changePasswordBtn')?.addEventListener('click', async () => {
+        const current = document.getElementById('currentPassword')?.value;
+        const newPass = document.getElementById('newPassword')?.value;
+        const confirm = document.getElementById('confirmPassword')?.value;
+        const status = document.getElementById('passwordStatus');
+
+        if (!current || !newPass || !confirm) {
+            if (status) { status.textContent = 'Tüm alanları doldurun!'; status.style.color = 'var(--error)'; }
+            return;
+        }
+        if (newPass !== confirm) {
+            if (status) { status.textContent = 'Yeni şifreler eşleşmiyor!'; status.style.color = 'var(--error)'; }
+            return;
+        }
+        if (newPass.length < 6) {
+            if (status) { status.textContent = 'Yeni şifre en az 6 karakter!'; status.style.color = 'var(--error)'; }
+            return;
+        }
+
+        if (status) { status.textContent = 'Değiştiriliyor...'; status.style.color = 'var(--text-muted)'; }
+
+        const result = await changePassword(current, newPass);
+        if (result.success) {
+            if (status) { status.textContent = '✅ Şifre başarıyla değiştirildi!'; status.style.color = 'var(--success)'; }
+            document.getElementById('currentPassword').value = '';
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmPassword').value = '';
+        } else {
+            if (status) { status.textContent = `❌ ${result.error}`; status.style.color = 'var(--error)'; }
+        }
+    });
+
+    // Çıkış
+    document.getElementById('logoutBtn')?.addEventListener('click', async () => {
+        await logout();
+        closeSettings();
+        location.reload();
+    });
 }
+
 
 function renderAppearanceTab() {
     const content = document.getElementById('settingsTabContent');

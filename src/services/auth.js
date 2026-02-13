@@ -9,7 +9,10 @@ import {
     signInWithEmailAndPassword,
     signOut,
     onAuthStateChanged,
-    updateProfile
+    updateProfile,
+    reauthenticateWithCredential,
+    EmailAuthProvider,
+    updatePassword
 } from 'firebase/auth';
 import {
     doc,
@@ -267,6 +270,35 @@ function getAuthErrorMessage(code) {
         'auth/operation-not-allowed': 'E-posta/şifre girişi etkin değil. Firebase Console\'dan aktifleştirin.'
     };
     return messages[code] || `Bir hata oluştu (${code}). Lütfen tekrar deneyin.`;
+}
+
+/**
+ * Şifre değiştir
+ */
+export async function changePassword(currentPassword, newPassword) {
+    if (!auth || !auth.currentUser) return { success: false, error: 'Oturum açık değil.' };
+
+    try {
+        const user = auth.currentUser;
+        const credential = EmailAuthProvider.credential(user.email, currentPassword);
+
+        // Mevcut şifre ile yeniden doğrula
+        await reauthenticateWithCredential(user, credential);
+
+        // Yeni şifreyi ayarla
+        await updatePassword(user, newPassword);
+
+        return { success: true };
+    } catch (error) {
+        console.error('Şifre değiştirme hatası:', error);
+        if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+            return { success: false, error: 'Mevcut şifreniz yanlış!' };
+        }
+        if (error.code === 'auth/weak-password') {
+            return { success: false, error: 'Yeni şifre en az 6 karakter olmalıdır.' };
+        }
+        return { success: false, error: getAuthErrorMessage(error.code) };
+    }
 }
 
 /**

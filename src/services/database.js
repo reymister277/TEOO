@@ -170,23 +170,38 @@ export async function deleteMessage(serverId, channelId, messageId) {
 // ============ Üye İşlemleri ============
 
 /**
- * Çevrimiçi üyeleri dinle
+ * Sunucu üyelerini dinle (sunucu bazlı filtreleme)
  */
-export function watchMembers(callback) {
-    return onSnapshot(collection(db, 'users'), (snapshot) => {
-        const members = [];
-        snapshot.forEach((doc) => {
-            members.push({ id: doc.id, ...doc.data() });
+export function watchMembers(serverId, callback) {
+    // Önce sunucu üyelerini al, sonra kullanıcı bilgilerini dinle
+    return onSnapshot(doc(db, 'servers', serverId), async (serverSnap) => {
+        if (!serverSnap.exists()) { callback([]); return; }
+
+        const memberIds = serverSnap.data().members || [];
+        if (memberIds.length === 0) { callback([]); return; }
+
+        // Tüm kullanıcıları dinle ama sadece sunucu üyelerini filtrele
+        const unsubUsers = onSnapshot(collection(db, 'users'), (usersSnap) => {
+            const members = [];
+            usersSnap.forEach((userDoc) => {
+                if (memberIds.includes(userDoc.id)) {
+                    members.push({ id: userDoc.id, ...userDoc.data() });
+                }
+            });
+            // Online olanlar üstte
+            members.sort((a, b) => {
+                if (a.status === 'online' && b.status !== 'online') return -1;
+                if (a.status !== 'online' && b.status === 'online') return 1;
+                return 0;
+            });
+            callback(members);
         });
-        // Online olanlar üstte
-        members.sort((a, b) => {
-            if (a.status === 'online' && b.status !== 'online') return -1;
-            if (a.status !== 'online' && b.status === 'online') return 1;
-            return 0;
-        });
-        callback(members);
+
+        // Cleanup fonksiyonu dönecek
+        return unsubUsers;
     });
 }
+
 
 // ============ Kanal İşlemleri ============
 

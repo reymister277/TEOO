@@ -30,6 +30,7 @@ export function renderSidebar(container) {
             <div class="server-header">
                 <h2>TEOO</h2>
                 <div class="server-header-actions">
+                    <button class="server-header-btn" title="Sunucu Ayarları" id="serverSettingsBtn">⚙️</button>
                     <button class="server-header-btn" title="Kanal Ekle" id="addChannelBtn">➕</button>
                 </div>
             </div>
@@ -203,6 +204,11 @@ function setupSidebarEvents() {
     // Kanal ekleme
     document.getElementById('addChannelBtn')?.addEventListener('click', () => {
         document.dispatchEvent(new CustomEvent('createChannel'));
+    });
+
+    // Sunucu ayarları
+    document.getElementById('serverSettingsBtn')?.addEventListener('click', () => {
+        document.dispatchEvent(new CustomEvent('openServerSettings'));
     });
 
     // Arkadaşlar butonu

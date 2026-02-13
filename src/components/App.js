@@ -11,6 +11,7 @@ import { renderSettings } from './settings/UserSettings.js';
 import { renderFriendPanel, updateFriendContent, updatePendingBadge, showAddFriendResult } from './friends/FriendPanel.js';
 import { renderHomePage } from './home/HomePage.js';
 import { renderServerModal, showServerSuccess, showModalError } from './server/ServerModal.js';
+import { renderServerSettings } from './server/ServerSettings.js';
 import {
     createDefaultServer,
     watchChannels,
@@ -82,8 +83,8 @@ export async function renderApp() {
     setState('serverList', servers);
     updateServerList(servers);
 
-    // Üyeleri dinle
-    watchMembers((members) => {
+    // Üyeleri dinle (sunucu bazlı)
+    watchMembers(currentServerId, (members) => {
         setState('members', members);
         updateMembers(members);
     });
@@ -150,6 +151,12 @@ function selectServer(serverId) {
                 selectChannel(firstTextChannel);
             }
         }
+    });
+
+    // Üyeleri sunucu bazlı dinle
+    watchMembers(serverId, (members) => {
+        setState('members', members);
+        updateMembers(members);
     });
 }
 
@@ -271,6 +278,13 @@ function setupAppEvents() {
     document.addEventListener('openServerModal', (e) => {
         const mode = e.detail?.mode || 'choose';
         renderServerModal(mode);
+    });
+
+    // Sunucu ayarları aç
+    document.addEventListener('openServerSettings', () => {
+        if (currentServerId && currentServerId !== 'teoo-main') {
+            renderServerSettings(currentServerId);
+        }
     });
 
     // Sunucu oluştur
