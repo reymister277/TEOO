@@ -1,0 +1,35 @@
+# Bağımlılıklar
+node_modules/
+.pnp
+.pnp.js
+
+# Build çıktısı
+dist/
+
+# Ortam değişkenleri (Firebase config gizli tutulmalı!)
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Vercel
+.vercel/
+
+# Log dosyaları
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Eski dosyalar
+teoo.html
+QUICKSTART.md

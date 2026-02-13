@@ -1,0 +1,43 @@
+{
+  "rules": {
+    "messages": {
+      "$channelId": {
+        ".read": true,
+        ".write": true,
+        ".validate": "newData.hasChildren(['author', 'avatar', 'text', 'timestamp', 'userId'])",
+        "$messageId": {
+          ".validate": "newData.child('author').isString() && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 2000"
+        }
+      }
+    },
+    "users": {
+      ".read": true,
+      ".write": true,
+      "$userId": {
+        ".validate": "newData.hasChildren(['name', 'avatar', 'status'])",
+        "name": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 50"
+        },
+        "avatar": {
+          ".validate": "newData.isString() && newData.val().length === 1"
+        },
+        "status": {
+          ".validate": "newData.val() === 'online' || newData.val() === 'offline' || newData.val() === 'away'"
+        }
+      }
+    },
+    "channels": {
+      ".read": true,
+      ".write": true,
+      "$channelId": {
+        ".validate": "newData.hasChildren(['name', 'type', 'description'])",
+        "name": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 50"
+        },
+        "type": {
+          ".validate": "newData.val() === 'text' || newData.val() === 'voice'"
+        }
+      }
+    }
+  }
+}
