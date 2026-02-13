@@ -166,7 +166,52 @@ export function watchAuthState(callback) {
 
     return onAuthStateChanged(auth, async (user) => {
         if (user) {
-            const profile = await getUserProfile(user.uid);
+            let profile = await getUserProfile(user.uid);
+
+            // friendCode yoksa oluştur (eski kullanıcılar için)
+            if (profile && !profile.friendCode) {
+                try {
+                    const friendCode = await generateUniqueFriendCode();
+                    await updateDoc(doc(db, 'users', user.uid), { friendCode });
+                    await setDoc(doc(db, 'friendCodes', friendCode), {
+                        uid: user.uid,
+                        displayName: user.displayName || profile.displayName || 'Kullanıcı'
+                    });
+                    profile.friendCode = friendCode;
+                    console.log('Arkadaş kodu oluşturuldu:', friendCode);
+                } catch (e) {
+                    console.error('Friend code oluşturma hatası:', e);
+                }
+            }
+
+            // Profil hiç yoksa oluştur
+            if (!profile) {
+                try {
+                    const friendCode = await generateUniqueFriendCode();
+                    profile = {
+                        uid: user.uid,
+                        displayName: user.displayName || 'Kullanıcı',
+                        email: user.email,
+                        avatar: '😀',
+                        friendCode,
+                        status: 'online',
+                        bio: '',
+                        friends: []
+                    };
+                    await setDoc(doc(db, 'users', user.uid), {
+                        ...profile,
+                        createdAt: serverTimestamp(),
+                        lastSeen: serverTimestamp()
+                    });
+                    await setDoc(doc(db, 'friendCodes', friendCode), {
+                        uid: user.uid,
+                        displayName: profile.displayName
+                    });
+                } catch (e) {
+                    console.error('Profil oluşturma hatası:', e);
+                }
+            }
+
             const userData = {
                 uid: user.uid,
                 email: user.email,
@@ -185,6 +230,7 @@ export function watchAuthState(callback) {
         }
     });
 }
+
 
 /**
  * Profili güncelle
