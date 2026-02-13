@@ -11,7 +11,7 @@ export function renderSidebar(container) {
     container.innerHTML = `
         <!-- Sunucu Barı -->
         <div class="server-bar">
-            <div class="server-icon home active tooltip" data-tooltip="Ana Sayfa" data-server="teoo-main">
+            <div class="server-icon home active tooltip" data-tooltip="Ana Sayfa" id="homeBtn">
                 <div class="server-indicator"></div>
                 🚀
             </div>
@@ -19,6 +19,9 @@ export function renderSidebar(container) {
                 👥
             </div>
             <div class="server-separator"></div>
+            <div id="serverListContainer">
+                <!-- Sunucu ikonları dinamik olarak buraya eklenir -->
+            </div>
             <div class="server-add tooltip" data-tooltip="Sunucu Ekle" id="addServerBtn">+</div>
         </div>
         
@@ -206,6 +209,16 @@ function setupSidebarEvents() {
     document.getElementById('friendsBtn')?.addEventListener('click', () => {
         document.dispatchEvent(new CustomEvent('showFriends'));
     });
+
+    // Ana sayfa butonu
+    document.getElementById('homeBtn')?.addEventListener('click', () => {
+        document.dispatchEvent(new CustomEvent('showHome'));
+    });
+
+    // Sunucu ekle butonu
+    document.getElementById('addServerBtn')?.addEventListener('click', () => {
+        document.dispatchEvent(new CustomEvent('openServerModal', { detail: { mode: 'choose' } }));
+    });
 }
 
 function updateUserPanel(user) {
@@ -261,4 +274,46 @@ function renderVoiceUser(user) {
             <span class="voice-user-name">${user.displayName || ''}</span>
         </div>
     `;
+}
+
+/**
+ * Sol barda sunucu listesini güncelle
+ */
+export function updateServerList(servers) {
+    const container = document.getElementById('serverListContainer');
+    if (!container) return;
+
+    // teoo-main hariç (o zaten 🚀 ikonu olarak var)
+    const customServers = servers.filter(s => s.id !== 'teoo-main');
+
+    if (customServers.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    container.innerHTML = customServers.map(server => `
+        <div class="server-icon tooltip" data-tooltip="${server.name}" data-server-id="${server.id}">
+            <div class="server-indicator"></div>
+            ${server.icon || '🎮'}
+        </div>
+    `).join('');
+
+    // Sunucu tıklama event'leri
+    container.querySelectorAll('.server-icon').forEach(icon => {
+        icon.addEventListener('click', () => {
+            // Aktif sınıfını güncelle
+            document.querySelectorAll('.server-bar .server-icon').forEach(s => s.classList.remove('active'));
+            icon.classList.add('active');
+
+            // Sunucu header'ını güncelle
+            const serverName = icon.dataset.tooltip;
+            const headerEl = document.querySelector('.server-header h2');
+            if (headerEl) headerEl.textContent = serverName;
+
+            // Sunucu değiştir
+            document.dispatchEvent(new CustomEvent('switchServer', {
+                detail: { serverId: icon.dataset.serverId }
+            }));
+        });
+    });
 }

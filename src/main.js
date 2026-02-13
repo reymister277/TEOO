@@ -14,6 +14,7 @@ import './styles/voice.css';
 import './styles/members.css';
 import './styles/settings.css';
 import './styles/friends.css';
+import './styles/home.css';
 
 // Modüller
 import { isFirebaseConfigured } from './config/firebase.js';

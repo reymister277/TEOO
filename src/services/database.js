@@ -18,7 +18,8 @@ import {
     orderBy,
     limit,
     onSnapshot,
-    serverTimestamp
+    serverTimestamp,
+    arrayUnion
 } from 'firebase/firestore';
 
 // ============ Sunucu (Server) İşlemleri ============
@@ -268,4 +269,187 @@ export function watchTyping(serverId, channelId, currentUserId, callback) {
             callback(typing);
         }
     );
+}
+
+// ============ Özel Sunucu İşlemleri ============
+
+/**
+ * 6 haneli benzersiz sunucu davet kodu üret
+ */
+async function generateServerInviteCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    let attempts = 0;
+
+    while (attempts < 50) {
+        code = '';
+        for (let i = 0; i < 6; i++) {
+            code += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        if (db) {
+            const codeDoc = await getDoc(doc(db, 'serverInvites', code));
+            if (!codeDoc.exists()) return code;
+        } else {
+            return code;
+        }
+        attempts++;
+    }
+    return code;
+}
+
+/**
+ * Yeni sunucu oluştur
+ */
+export async function createServer(name, icon, userId, userName) {
+    if (!db) return { success: false, error: 'Veritabanı bağlantısı yok.' };
+
+    try {
+        // Davet kodu üret
+        const inviteCode = await generateServerInviteCode();
+
+        // Sunucuyu oluştur
+        const serverRef = await addDoc(collection(db, 'servers'), {
+            name,
+            icon: icon || '🎮',
+            ownerId: userId,
+            ownerName: userName,
+            inviteCode,
+            memberCount: 1,
+            members: [userId],
+            createdAt: serverTimestamp()
+        });
+
+        const serverId = serverRef.id;
+
+        // Davet kodu eşleştirmesi
+        await setDoc(doc(db, 'serverInvites', inviteCode), {
+            serverId,
+            serverName: name,
+            createdBy: userId
+        });
+
+        // Varsayılan kanallar oluştur
+        const defaultChannels = [
+            { name: 'genel', type: 'text', description: 'Genel sohbet kanalı', order: 0 },
+            { name: 'duyurular', type: 'text', description: 'Önemli duyurular', order: 1 },
+            { name: 'Genel Ses', type: 'voice', description: 'Sesli sohbet', order: 2 }
+        ];
+
+        for (const channel of defaultChannels) {
+            await addDoc(collection(db, 'servers', serverId, 'channels'), {
+                ...channel,
+                serverId,
+                createdAt: serverTimestamp()
+            });
+        }
+
+        // Kullanıcının sunucu listesine ekle
+        await updateDoc(doc(db, 'users', userId), {
+            servers: arrayUnion(serverId)
+        });
+
+        return { success: true, serverId, inviteCode };
+    } catch (error) {
+        console.error('Sunucu oluşturma hatası:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Sunucuya davet kodu ile katıl
+ */
+export async function joinServerByCode(inviteCode, userId, userName) {
+    if (!db) return { success: false, error: 'Veritabanı bağlantısı yok.' };
+
+    try {
+        // Davet kodunu kontrol et
+        const inviteDoc = await getDoc(doc(db, 'serverInvites', inviteCode.toUpperCase()));
+        if (!inviteDoc.exists()) {
+            return { success: false, error: 'Geçersiz davet kodu!' };
+        }
+
+        const { serverId, serverName } = inviteDoc.data();
+
+        // Sunucu var mı kontrol et
+        const serverDoc = await getDoc(doc(db, 'servers', serverId));
+        if (!serverDoc.exists()) {
+            return { success: false, error: 'Bu sunucu artık mevcut değil.' };
+        }
+
+        // Zaten üye mi?
+        const serverData = serverDoc.data();
+        if (serverData.members?.includes(userId)) {
+            return { success: false, error: 'Bu sunucuya zaten katılmışsın!' };
+        }
+
+        // Sunucuya üye olarak ekle
+        await updateDoc(doc(db, 'servers', serverId), {
+            members: arrayUnion(userId),
+            memberCount: (serverData.memberCount || 1) + 1
+        });
+
+        // Kullanıcının sunucu listesine ekle
+        await updateDoc(doc(db, 'users', userId), {
+            servers: arrayUnion(serverId)
+        });
+
+        return { success: true, serverId, serverName };
+    } catch (error) {
+        console.error('Sunucuya katılma hatası:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Kullanıcının sunucu bilgilerini getir
+ */
+export async function getUserServers(userId) {
+    if (!db) return [];
+
+    try {
+        const userDoc = await getDoc(doc(db, 'users', userId));
+        if (!userDoc.exists()) return [];
+
+        const serverIds = userDoc.data().servers || [];
+        const servers = [];
+
+        // teoo-main her zaman ilk olmalı
+        const mainDoc = await getDoc(doc(db, 'servers', 'teoo-main'));
+        if (mainDoc.exists()) {
+            servers.push({ id: 'teoo-main', ...mainDoc.data() });
+        }
+
+        for (const id of serverIds) {
+            if (id === 'teoo-main') continue;
+            try {
+                const serverDoc = await getDoc(doc(db, 'servers', id));
+                if (serverDoc.exists()) {
+                    servers.push({ id, ...serverDoc.data() });
+                }
+            } catch (e) {
+                // Sessiz hata
+            }
+        }
+
+        return servers;
+    } catch (error) {
+        console.error('Sunucu listesi hatası:', error);
+        return [];
+    }
+}
+
+/**
+ * Sunucu bilgisini getir
+ */
+export async function getServerInfo(serverId) {
+    if (!db) return null;
+    try {
+        const serverDoc = await getDoc(doc(db, 'servers', serverId));
+        if (serverDoc.exists()) {
+            return { id: serverId, ...serverDoc.data() };
+        }
+        return null;
+    } catch (error) {
+        return null;
+    }
 }
