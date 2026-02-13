@@ -54,6 +54,8 @@ export function renderSidebar(container) {
                 <div class="voice-controls-bar">
                     <button class="voice-control-btn" id="micToggleBtn" title="Mikrofon">🎤</button>
                     <button class="voice-control-btn" id="speakerToggleBtn" title="Hoparlör">🔊</button>
+                    <button class="voice-control-btn" id="screenShareBtn" title="Ekran Paylaş">🖥️</button>
+                    <button class="voice-control-btn disconnect" id="voiceDisconnectBtn" title="Bağlantıyı Kes">📞</button>
                 </div>
             </div>
             
@@ -199,6 +201,16 @@ function setupSidebarEvents() {
 
     document.getElementById('speakerToggleBtn')?.addEventListener('click', () => {
         document.dispatchEvent(new CustomEvent('toggleSpeaker'));
+    });
+
+    // Ekran paylaş
+    document.getElementById('screenShareBtn')?.addEventListener('click', () => {
+        document.dispatchEvent(new CustomEvent('toggleScreenShare'));
+    });
+
+    // Bağlantıyı kes
+    document.getElementById('voiceDisconnectBtn')?.addEventListener('click', () => {
+        document.dispatchEvent(new CustomEvent('disconnectVoice'));
     });
 
     // Kanal ekleme

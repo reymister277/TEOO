@@ -16,6 +16,7 @@ import {
 import { setState, getState } from '../utils/state.js';
 
 let localStream = null;
+let screenStream = null;
 let peerConnections = {};
 let voiceUsersUnsubscribe = null;
 let signalingUnsubscribes = {};
@@ -143,19 +144,27 @@ async function createPeerConnection(serverId, channelId, myUid, remoteUid) {
             });
         }
 
-        // Uzak ses geldiğinde çal
+        // Uzak ses/video geldiğinde çal
         pc.ontrack = (event) => {
-            const audio = document.createElement('audio');
-            audio.srcObject = event.streams[0];
-            audio.autoplay = true;
-            audio.className = 'remote-audio';
-            audio.id = `audio-${remoteUid}`;
+            const track = event.track;
+            if (track.kind === 'video') {
+                // Video (ekran paylaşımı)
+                document.dispatchEvent(new CustomEvent('screenShareReceived', {
+                    detail: { stream: event.streams[0], uid: remoteUid }
+                }));
+            } else {
+                // Audio
+                const audio = document.createElement('audio');
+                audio.srcObject = event.streams[0];
+                audio.autoplay = true;
+                audio.className = 'remote-audio';
+                audio.id = `audio-${remoteUid}`;
 
-            // Mevcut aynı ID'li audio'yu kaldır
-            const existing = document.getElementById(`audio-${remoteUid}`);
-            if (existing) existing.remove();
+                const existing = document.getElementById(`audio-${remoteUid}`);
+                if (existing) existing.remove();
 
-            document.body.appendChild(audio);
+                document.body.appendChild(audio);
+            }
         };
 
         // ICE adaylarını Firestore üzerinden karşı tarafa gönder
@@ -361,4 +370,92 @@ export function isMicEnabled() {
  */
 export function isSpeakerEnabled() {
     return getState('voice.speakerEnabled');
+}
+
+/**
+ * Ekran paylaşımı başlat
+ */
+export async function startScreenShare() {
+    const voice = getState('voice');
+    if (!voice?.connected) {
+        return { success: false, error: 'Ekran paylaşmak için önce sesli kanala katılmalısın!' };
+    }
+
+    try {
+        // Ekran seçimi popup'ı
+        screenStream = await navigator.mediaDevices.getDisplayMedia({
+            video: {
+                cursor: 'always',
+                width: { ideal: 1920 },
+                height: { ideal: 1080 },
+                frameRate: { ideal: 30, max: 60 }
+            },
+            audio: true // Sistem sesi de paylaşılabilir
+        });
+
+        // Video track'ı tüm peer connection'lara ekle
+        const videoTrack = screenStream.getVideoTracks()[0];
+        if (videoTrack) {
+            Object.values(peerConnections).forEach(pc => {
+                pc.addTrack(videoTrack, screenStream);
+            });
+        }
+
+        // Ses track'ı varsa ekle
+        const audioTrack = screenStream.getAudioTracks()[0];
+        if (audioTrack) {
+            Object.values(peerConnections).forEach(pc => {
+                pc.addTrack(audioTrack, screenStream);
+            });
+        }
+
+        // Kullanıcı tarayıcıdan paylaşımı durdurursa
+        videoTrack.onended = () => {
+            stopScreenShare();
+        };
+
+        setState('voice.screenSharing', true);
+
+        // Kendi ekranımızı da göster
+        document.dispatchEvent(new CustomEvent('screenShareStarted', {
+            detail: { stream: screenStream, isLocal: true }
+        }));
+
+        return { success: true };
+    } catch (error) {
+        console.error('Ekran paylaşımı hatası:', error);
+
+        if (error.name === 'NotAllowedError') {
+            return { success: false, error: 'Ekran paylaşımı izni reddedildi.' };
+        }
+        return { success: false, error: 'Ekran paylaşılamadı: ' + error.message };
+    }
+}
+
+/**
+ * Ekran paylaşımını durdur
+ */
+export function stopScreenShare() {
+    if (screenStream) {
+        screenStream.getTracks().forEach(track => {
+            track.stop();
+            // Peer connection'lardan kaldır
+            Object.values(peerConnections).forEach(pc => {
+                const senders = pc.getSenders();
+                const sender = senders.find(s => s.track === track);
+                if (sender) pc.removeTrack(sender);
+            });
+        });
+        screenStream = null;
+    }
+
+    setState('voice.screenSharing', false);
+    document.dispatchEvent(new CustomEvent('screenShareStopped'));
+}
+
+/**
+ * Ekran paylaşımı durumunu kontrol et
+ */
+export function isScreenSharing() {
+    return getState('voice.screenSharing') || false;
 }

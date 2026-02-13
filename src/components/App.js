@@ -39,7 +39,7 @@ import {
     watchDirectMessages,
     getDMChatId
 } from '../services/friends.js';
-import { joinVoiceChannel, leaveVoiceChannel, toggleMicrophone, toggleSpeaker } from '../services/voice.js';
+import { joinVoiceChannel, leaveVoiceChannel, toggleMicrophone, toggleSpeaker, startScreenShare, stopScreenShare, isScreenSharing } from '../services/voice.js';
 import { debounce } from '../utils/helpers.js';
 
 let currentMessageUnsubscribe = null;
@@ -114,6 +114,71 @@ export async function renderApp() {
 /**
  * Karşılama sayfası modu
  */
+/**
+ * Ekran paylaşımı video viewer göster
+ */
+function showScreenViewer(stream, isLocal) {
+    hideScreenViewer(); // Öncekini temizle
+
+    const viewer = document.createElement('div');
+    viewer.id = 'screenShareViewer';
+    viewer.className = 'screen-share-overlay';
+    viewer.innerHTML = `
+        <div class="screen-share-header">
+            <span>🖥️ ${isLocal ? 'Ekranınızı Paylaşıyorsunuz' : 'Ekran Paylaşımı'}</span>
+            <div class="screen-share-header-actions">
+                <button class="screen-share-fullscreen-btn" id="screenFullscreenBtn" title="Tam Ekran">⛶</button>
+                ${isLocal ? '<button class="screen-share-stop-btn" id="screenStopBtn">Paylaşımı Durdur</button>' : ''}
+            </div>
+        </div>
+        <div class="screen-share-video-container">
+            <video id="screenShareVideo" autoplay playsinline></video>
+        </div>
+    `;
+
+    const chatContainer = document.getElementById('chatContainer');
+    if (chatContainer) {
+        chatContainer.style.position = 'relative';
+        chatContainer.appendChild(viewer);
+    } else {
+        document.body.appendChild(viewer);
+    }
+
+    const video = document.getElementById('screenShareVideo');
+    if (video) {
+        video.srcObject = stream;
+    }
+
+    // Paylaşımı durdur butonu
+    document.getElementById('screenStopBtn')?.addEventListener('click', () => {
+        document.dispatchEvent(new CustomEvent('toggleScreenShare'));
+    });
+
+    // Tam ekran
+    document.getElementById('screenFullscreenBtn')?.addEventListener('click', () => {
+        const videoEl = document.getElementById('screenShareVideo');
+        if (videoEl) {
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            } else {
+                videoEl.requestFullscreen().catch(() => { });
+            }
+        }
+    });
+
+    // Ekran paylaş butonunu aktif yap
+    const btn = document.getElementById('screenShareBtn');
+    if (btn) { btn.textContent = '🔴'; btn.classList.add('active'); }
+}
+
+/**
+ * Ekran paylaşımı viewer'ı kaldır
+ */
+function hideScreenViewer() {
+    const viewer = document.getElementById('screenShareViewer');
+    if (viewer) viewer.remove();
+}
+
 function showHomeMode() {
     appMode = 'home';
     currentDMFriend = null;
@@ -460,6 +525,41 @@ function setupAppEvents() {
 
     document.addEventListener('toggleMic', () => toggleMicrophone());
     document.addEventListener('toggleSpeaker', () => toggleSpeaker());
+
+    // Ekran paylaşımı toggle
+    document.addEventListener('toggleScreenShare', async () => {
+        if (isScreenSharing()) {
+            stopScreenShare();
+        } else {
+            const result = await startScreenShare();
+            if (!result.success) {
+                alert(result.error);
+            }
+        }
+    });
+
+    // Bağlantıyı kes
+    document.addEventListener('disconnectVoice', () => {
+        stopScreenShare();
+        leaveVoiceChannel(user);
+    });
+
+    // Ekran paylaşımı başladı - video viewer göster
+    document.addEventListener('screenShareStarted', (e) => {
+        showScreenViewer(e.detail.stream, true);
+    });
+
+    // Uzaktan ekran paylaşımı geldi
+    document.addEventListener('screenShareReceived', (e) => {
+        showScreenViewer(e.detail.stream, false);
+    });
+
+    // Ekran paylaşımı durdu
+    document.addEventListener('screenShareStopped', () => {
+        hideScreenViewer();
+        const btn = document.getElementById('screenShareBtn');
+        if (btn) { btn.textContent = '🖥️'; btn.classList.remove('active'); }
+    });
 
     document.addEventListener('createChannel', async () => {
         const name = prompt('Yeni kanal adı:');
