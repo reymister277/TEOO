@@ -564,3 +564,106 @@ export function stopScreenShare() {
 export function isScreenSharing() {
     return getState('voice.screenSharing') || false;
 }
+
+// ============ Push-to-Talk (PTT) Sistemi ============
+
+let pttEnabled = false;
+let pttKeyHandler = null;
+let pttKeyUpHandler = null;
+
+/**
+ * Push-to-Talk modunu aktifleştir
+ * Mic varsayılan olarak mute, tuşa basınca açılır
+ */
+export function enablePTT() {
+    if (!localStream) return;
+    pttEnabled = true;
+
+    // Mic'i mute et
+    const audioTrack = localStream.getAudioTracks()[0];
+    if (audioTrack) {
+        audioTrack.enabled = false;
+        setState('voice.micEnabled', false);
+    }
+
+    const pttKey = localStorage.getItem('pttKey') || 'Space';
+
+    // Önceki listener'ları temizle
+    if (pttKeyHandler) {
+        document.removeEventListener('keydown', pttKeyHandler);
+        document.removeEventListener('keyup', pttKeyUpHandler);
+    }
+
+    // Tuşa basınca mic aç
+    pttKeyHandler = (e) => {
+        // Input/textarea'da yazarken PTT tetikleme
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        if (e.code === pttKey && !e.repeat) {
+            e.preventDefault();
+            const track = localStream?.getAudioTracks()[0];
+            if (track && !track.enabled) {
+                track.enabled = true;
+                setState('voice.micEnabled', true);
+                document.dispatchEvent(new CustomEvent('micToggled', { detail: { enabled: true } }));
+                document.dispatchEvent(new CustomEvent('pttActive', { detail: { active: true } }));
+            }
+        }
+    };
+
+    // Tuşu bırakınca mic kapat
+    pttKeyUpHandler = (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        if (e.code === pttKey) {
+            e.preventDefault();
+            const track = localStream?.getAudioTracks()[0];
+            if (track && track.enabled) {
+                track.enabled = false;
+                setState('voice.micEnabled', false);
+                document.dispatchEvent(new CustomEvent('micToggled', { detail: { enabled: false } }));
+                document.dispatchEvent(new CustomEvent('pttActive', { detail: { active: false } }));
+            }
+        }
+    };
+
+    document.addEventListener('keydown', pttKeyHandler);
+    document.addEventListener('keyup', pttKeyUpHandler);
+
+    // UI güncelle
+    document.dispatchEvent(new CustomEvent('micToggled', { detail: { enabled: false } }));
+    document.dispatchEvent(new CustomEvent('pttModeChanged', { detail: { enabled: true } }));
+}
+
+/**
+ * Push-to-Talk modunu devre dışı bırak (normal moda dön)
+ */
+export function disablePTT() {
+    pttEnabled = false;
+
+    // Listener'ları temizle
+    if (pttKeyHandler) {
+        document.removeEventListener('keydown', pttKeyHandler);
+        document.removeEventListener('keyup', pttKeyUpHandler);
+        pttKeyHandler = null;
+        pttKeyUpHandler = null;
+    }
+
+    // Mic'i aç
+    if (localStream) {
+        const audioTrack = localStream.getAudioTracks()[0];
+        if (audioTrack) {
+            audioTrack.enabled = true;
+            setState('voice.micEnabled', true);
+        }
+    }
+
+    document.dispatchEvent(new CustomEvent('micToggled', { detail: { enabled: true } }));
+    document.dispatchEvent(new CustomEvent('pttModeChanged', { detail: { enabled: false } }));
+}
+
+/**
+ * PTT modu aktif mi?
+ */
+export function isPTTEnabled() {
+    return pttEnabled;
+}
+

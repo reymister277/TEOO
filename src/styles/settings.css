@@ -479,6 +479,34 @@
     font-weight: 600;
     color: var(--text-secondary);
     font-family: monospace;
+    cursor: pointer;
+    transition: var(--transition);
+    min-width: 80px;
+    justify-content: center;
+}
+
+.ptt-key-badge:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+.ptt-key-badge.recording {
+    border-color: var(--error);
+    color: var(--error);
+    animation: pttRecordPulse 1s infinite;
+}
+
+@keyframes pttRecordPulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(240, 71, 71, 0.4);
+    }
+
+    50% {
+        box-shadow: 0 0 0 4px rgba(240, 71, 71, 0);
+    }
 }
 
 /* === Setting Description === */

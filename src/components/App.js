@@ -40,7 +40,7 @@ import {
     watchDirectMessages,
     getDMChatId
 } from '../services/friends.js';
-import { joinVoiceChannel, leaveVoiceChannel, toggleMicrophone, toggleSpeaker, startScreenShare, stopScreenShare, isScreenSharing } from '../services/voice.js';
+import { joinVoiceChannel, leaveVoiceChannel, toggleMicrophone, toggleSpeaker, startScreenShare, stopScreenShare, isScreenSharing, enablePTT, disablePTT, isPTTEnabled } from '../services/voice.js';
 import { uploadChatFile, uploadProfileImage, getFileType } from '../services/storage.js';
 import { debounce } from '../utils/helpers.js';
 
@@ -470,21 +470,32 @@ function setupAppEvents() {
         }
     });
 
-    // Profil resmi yükleme
+    // Profil resmi yükleme (Base64 olarak Firestore'a kaydet - Storage gerektirmez)
     document.addEventListener('uploadProfileImage', async (e) => {
         const { file } = e.detail;
-        const result = await uploadProfileImage(file, user.uid);
-        if (result.success) {
-            // Firestore kullanıcı dokümanını güncelle
-            await updateUserProfile(user.uid, { photoURL: result.url });
-            // Sidebar avatarı güncelle
-            const sidebarAvatar = document.getElementById('sidebarAvatar');
-            if (sidebarAvatar) {
-                sidebarAvatar.innerHTML = `<img src="${result.url}" class="avatar-image" alt="Profil" />`;
+        try {
+            // Resmi 128x128'e küçült ve Base64'e çevir
+            const base64 = await resizeImageToBase64(file, 128);
+            // Firestore'a kaydet
+            const result = await updateUserProfile(user.uid, { photoURL: base64 });
+            if (result.success) {
+                // Sidebar avatarı güncelle
+                const sidebarAvatar = document.getElementById('sidebarAvatar');
+                if (sidebarAvatar) {
+                    sidebarAvatar.innerHTML = `<img src="${base64}" class="avatar-image" alt="Profil" />`;
+                }
+                setState('user', { ...getState('user'), photoURL: base64 });
+                // Settings'teki avatarı da güncelle
+                const profileAvatar = document.getElementById('profileAvatar');
+                if (profileAvatar) {
+                    profileAvatar.innerHTML = `<img src="${base64}" class="avatar-image" alt="Profil" />`;
+                }
+            } else {
+                alert(result.error || 'Profil resmi yüklenemedi!');
             }
-            setState('user', { ...getState('user'), photoURL: result.url });
-        } else {
-            alert(result.error || 'Profil resmi yüklenemedi!');
+        } catch (err) {
+            console.error('Profil resmi hatası:', err);
+            alert('Profil resmi yüklenemedi: ' + err.message);
         }
     });
 
@@ -591,19 +602,28 @@ function setupAppEvents() {
     });
 
     document.addEventListener('toggleMic', () => {
-        const enabled = toggleMicrophone();
-        const btn = document.getElementById('micToggleBtn');
-        if (btn) {
-            btn.textContent = enabled ? '🎤' : '🔇';
-            btn.classList.toggle('muted', !enabled);
-        }
+        toggleMicrophone();
     });
     document.addEventListener('toggleSpeaker', () => {
-        const enabled = toggleSpeaker();
-        const btn = document.getElementById('speakerToggleBtn');
-        if (btn) {
-            btn.textContent = enabled ? '🔊' : '🔈';
-            btn.classList.toggle('muted', !enabled);
+        toggleSpeaker();
+    });
+
+    // Ses modu değiştiğinde PTT'yi aktif/pasif yap
+    document.addEventListener('voiceModeSwitched', (e) => {
+        const { mode } = e.detail;
+        if (mode === 'ptt') {
+            enablePTT();
+        } else {
+            disablePTT();
+        }
+    });
+
+    // PTT aktif göstergesi (Space basılı tutulurken)
+    document.addEventListener('pttActive', (e) => {
+        const micBtn = document.getElementById('micToggleBtn');
+        if (micBtn) {
+            micBtn.classList.toggle('ptt-active', e.detail.active);
+            micBtn.textContent = e.detail.active ? '🎙️' : '🔇';
         }
     });
 
@@ -747,5 +767,51 @@ function setupMobileSidebar() {
             members?.classList.remove('mobile-open');
             overlay.classList.remove('active');
         }
+    });
+}
+
+/**
+ * Resmi küçültüp Base64 string'e çevir (Firestore'a kaydetmek için)
+ * @param {File} file - Resim dosyası
+ * @param {number} maxSize - Max genişlik/yükseklik (px)
+ * @returns {Promise<string>} Base64 data URL
+ */
+function resizeImageToBase64(file, maxSize = 128) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+
+                // En-boy oranını koru, max boyuta küçült
+                if (width > height) {
+                    if (width > maxSize) {
+                        height = Math.round((height * maxSize) / width);
+                        width = maxSize;
+                    }
+                } else {
+                    if (height > maxSize) {
+                        width = Math.round((width * maxSize) / height);
+                        height = maxSize;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // WebP veya JPEG olarak, kalite 0.8
+                const base64 = canvas.toDataURL('image/webp', 0.8);
+                resolve(base64);
+            };
+            img.onerror = () => reject(new Error('Resim yüklenemedi'));
+            img.src = e.target.result;
+        };
+        reader.onerror = () => reject(new Error('Dosya okunamadı'));
+        reader.readAsDataURL(file);
     });
 }

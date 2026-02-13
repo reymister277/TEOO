@@ -6,6 +6,28 @@ import { getState, setState } from '../../utils/state.js';
 import { updateUserProfile, logout, changePassword } from '../../services/auth.js';
 import { AVATAR_EMOJIS } from '../../utils/helpers.js';
 
+/**
+ * PTT tuş kodunu kullanıcıya gösterilecek güzel isme çevir
+ */
+function getPTTKeyName() {
+    const key = localStorage.getItem('pttKey') || 'Space';
+    const keyNames = {
+        'Space': 'Space',
+        'ControlLeft': 'Sol Ctrl',
+        'ControlRight': 'Sağ Ctrl',
+        'ShiftLeft': 'Sol Shift',
+        'ShiftRight': 'Sağ Shift',
+        'AltLeft': 'Sol Alt',
+        'AltRight': 'Sağ Alt',
+        'CapsLock': 'Caps Lock',
+        'Tab': 'Tab',
+        'Backquote': '`',
+        'Escape': 'ESC'
+    };
+    return keyNames[key] || key.replace('Key', '').replace('Digit', '');
+}
+
+
 export function renderSettings() {
     const user = getState('user');
     if (!user) return;
@@ -427,9 +449,9 @@ function renderVoiceTab() {
             <div class="setting-row" style="margin-top: 16px;">
                 <div>
                     <div class="setting-label">Tuşla Yakala Tuşu</div>
-                    <div class="setting-desc">Varsayılan: Space tuşu</div>
+                    <div class="setting-desc">Tıklayıp yeni tuş seçin</div>
                 </div>
-                <kbd class="ptt-key-badge">Space</kbd>
+                <button class="ptt-key-badge" id="pttKeyBadge" title="Tıklayıp yeni tuş seçin">${getPTTKeyName()}</button>
             </div>
         `}
 
@@ -475,7 +497,32 @@ function renderVoiceTab() {
         if (!option) return;
         const mode = option.dataset.mode;
         localStorage.setItem('voiceMode', mode);
+        // Voice modunu değiştir event'i dispatch et
+        document.dispatchEvent(new CustomEvent('voiceModeSwitched', {
+            detail: { mode }
+        }));
         renderVoiceTab(); // Yeniden render
+    });
+
+    // PTT tuş seçme
+    document.getElementById('pttKeyBadge')?.addEventListener('click', function () {
+        const badge = this;
+        badge.textContent = 'Tuşa basın...';
+        badge.classList.add('recording');
+
+        const keyListener = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            localStorage.setItem('pttKey', e.code);
+            badge.textContent = getPTTKeyName();
+            badge.classList.remove('recording');
+            document.removeEventListener('keydown', keyListener);
+            // PTT'yi yeni tuşla yeniden aktif et
+            document.dispatchEvent(new CustomEvent('voiceModeSwitched', {
+                detail: { mode: 'ptt' }
+            }));
+        };
+        document.addEventListener('keydown', keyListener);
     });
 
     // Sensitivity slider
