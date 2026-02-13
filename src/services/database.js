@@ -167,6 +167,36 @@ export async function deleteMessage(serverId, channelId, messageId) {
     }
 }
 
+/**
+ * Mesaja tepki ekle
+ */
+export async function addReaction(serverId, channelId, messageId, emoji, userId, userName) {
+    try {
+        const msgRef = doc(db, 'servers', serverId, 'channels', channelId, 'messages', messageId);
+        const msgSnap = await getDoc(msgRef);
+        if (!msgSnap.exists()) return;
+
+        const reactions = msgSnap.data().reactions || {};
+        const emojiReactions = reactions[emoji] || [];
+
+        // Zaten tepki verdiyse kaldır
+        const existing = emojiReactions.find(r => r.uid === userId);
+        if (existing) {
+            reactions[emoji] = emojiReactions.filter(r => r.uid !== userId);
+            if (reactions[emoji].length === 0) delete reactions[emoji];
+        } else {
+            reactions[emoji] = [...emojiReactions, { uid: userId, name: userName }];
+        }
+
+        await updateDoc(msgRef, { reactions });
+        return { success: true };
+    } catch (error) {
+        console.error('Tepki hatası:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+
 // ============ Üye İşlemleri ============
 
 /**

@@ -5,13 +5,14 @@
 
 import { getState, setState, onStateChange } from '../utils/state.js';
 import { renderSidebar, renderChannels, updateServerList } from './sidebar/Sidebar.js';
-import { renderChatArea, updateChatHeader, renderMessages, updateTypingIndicator } from './chat/ChatArea.js';
+import { renderChatArea, updateChatHeader, renderMessages, updateTypingIndicator, startInlineEdit } from './chat/ChatArea.js';
 import { renderMemberPanel, updateMembers } from './members/MemberPanel.js';
 import { renderSettings } from './settings/UserSettings.js';
 import { renderFriendPanel, updateFriendContent, updatePendingBadge, showAddFriendResult } from './friends/FriendPanel.js';
 import { renderHomePage } from './home/HomePage.js';
 import { renderServerModal, showServerSuccess, showModalError } from './server/ServerModal.js';
 import { renderServerSettings } from './server/ServerSettings.js';
+import { showProfileCard } from './profile/ProfileCard.js';
 import {
     createDefaultServer,
     watchChannels,
@@ -25,7 +26,8 @@ import {
     watchTyping,
     createServer,
     joinServerByCode,
-    getUserServers
+    getUserServers,
+    addReaction
 } from '../services/database.js';
 import {
     sendFriendRequest,
@@ -377,18 +379,34 @@ function setupAppEvents() {
         await deleteMessage(serverId, channelId, messageId);
     });
 
-    document.addEventListener('editMessage', async (e) => {
+    // Inline edit başlat (edit butonuna tıklandığında)
+    document.addEventListener('editMessage', (e) => {
         const { messageId } = e.detail;
+        startInlineEdit(messageId);
+    });
+
+    // Inline edit kaydet
+    document.addEventListener('saveEditMessage', async (e) => {
+        const { messageId, newText } = e.detail;
         const serverId = currentServerId || getState('currentServer');
         const channelId = getState('currentChannel');
-        if (!channelId || !messageId) return;
-        const messages = getState('messages');
-        const msg = messages.find(m => m.id === messageId);
-        if (!msg) return;
-        const newText = prompt('Mesajı düzenle:', msg.text);
-        if (newText && newText !== msg.text) {
-            await editMessage(serverId, channelId, messageId, newText);
-        }
+        if (!channelId || !messageId || !newText) return;
+        await editMessage(serverId, channelId, messageId, newText);
+    });
+
+    // Emoji tepkisi
+    document.addEventListener('addReaction', async (e) => {
+        const { messageId, emoji } = e.detail;
+        const serverId = currentServerId || getState('currentServer');
+        const channelId = getState('currentChannel');
+        if (!channelId || !messageId || !emoji) return;
+        await addReaction(serverId, channelId, messageId, emoji, user.uid, user.displayName);
+    });
+
+    // Profil kartı göster
+    document.addEventListener('showProfileCard', (e) => {
+        const { uid, displayName, anchorEl } = e.detail;
+        showProfileCard(uid, displayName, anchorEl);
     });
 
     const typingDebounce = debounce(() => {

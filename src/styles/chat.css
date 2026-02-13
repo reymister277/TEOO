@@ -317,3 +317,273 @@
 .message-textarea::placeholder {
     color: var(--text-muted);
 }
+
+/* === Düzenlenmiş Etiketi === */
+.message-edited-tag {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-left: 4px;
+}
+
+/* === Inline Edit === */
+.inline-edit-container {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.inline-edit-input {
+    width: 100%;
+    min-height: 36px;
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
+    background: var(--bg-primary);
+    border: 1px solid var(--accent-primary);
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: inherit;
+    line-height: 1.4;
+    resize: none;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(124, 92, 252, 0.15);
+}
+
+.inline-edit-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.inline-edit-hint {
+    font-size: 11px;
+    color: var(--text-muted);
+    flex: 1;
+}
+
+.inline-edit-cancel,
+.inline-edit-save {
+    padding: 4px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: var(--transition-fast);
+}
+
+.inline-edit-cancel {
+    background: transparent;
+    color: var(--text-muted);
+}
+
+.inline-edit-cancel:hover {
+    color: var(--text-primary);
+}
+
+.inline-edit-save {
+    background: var(--accent-primary);
+    color: white;
+}
+
+.inline-edit-save:hover {
+    background: var(--accent-secondary);
+}
+
+/* === Emoji Tepkileri === */
+.message-reactions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.reaction-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    font-size: 14px;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.reaction-btn:hover {
+    background: var(--bg-hover);
+    border-color: rgba(124, 92, 252, 0.3);
+}
+
+.reaction-btn.reacted {
+    background: rgba(124, 92, 252, 0.15);
+    border-color: var(--accent-primary);
+}
+
+.reaction-count {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+/* === Emoji Picker Popup === */
+.emoji-picker-popup {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    padding: 8px;
+    animation: fadeIn 0.15s ease;
+}
+
+.emoji-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2px;
+}
+
+.emoji-pick-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: var(--transition-fast);
+    background: transparent;
+    border: none;
+}
+
+.emoji-pick-btn:hover {
+    background: var(--bg-hover);
+    transform: scale(1.2);
+}
+
+/* === Profil Kartı === */
+.profile-card-popup {
+    animation: slideInUp 0.2s ease;
+}
+
+.profile-card {
+    width: 300px;
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.profile-card-banner {
+    height: 60px;
+    position: relative;
+}
+
+.profile-card-avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    font-weight: 700;
+    margin: -32px auto 0;
+    position: relative;
+    border: 4px solid var(--bg-secondary);
+}
+
+.profile-card-body {
+    padding: 12px 16px 16px;
+    text-align: center;
+}
+
+.profile-card-name {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.profile-card-bio {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.profile-card-section {
+    margin-top: 12px;
+    text-align: left;
+}
+
+.profile-card-section-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+
+.profile-card-roles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.profile-role-badge {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid;
+    font-weight: 500;
+}
+
+.profile-role-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.profile-card-actions {
+    margin-top: 12px;
+}
+
+.profile-card-btn {
+    width: 100%;
+    padding: 8px 16px;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: var(--transition-fast);
+}
+
+.profile-card-btn.primary {
+    background: var(--accent-primary);
+    color: white;
+}
+
+.profile-card-btn.primary:hover {
+    background: var(--accent-secondary);
+}
+
+.profile-card-loading {
+    padding: 24px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+/* === Clickable User === */
+.clickable-user {
+    cursor: pointer;
+}
+
+.clickable-user:hover {
+    filter: brightness(1.1);
+}

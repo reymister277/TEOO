@@ -5,6 +5,8 @@
 import { getState, onStateChange } from '../../utils/state.js';
 import { formatTime, formatDate, escapeHtml, getInitials, getAvatarColor } from '../../utils/helpers.js';
 
+const QUICK_EMOJIS = ['👍', '❤️', '😂', '🔥', '💀', '😮', '🎉', '💯'];
+
 export function renderChatArea(container) {
     container.innerHTML = `
         <div class="main-content">
@@ -76,6 +78,29 @@ export function updateChatHeader(channelName, description) {
 }
 
 /**
+ * Emoji tepkilerini render et
+ */
+function renderReactions(reactions, msgId) {
+    if (!reactions || Object.keys(reactions).length === 0) return '';
+
+    const user = getState('user');
+    return `
+        <div class="message-reactions">
+            ${Object.entries(reactions).map(([emoji, users]) => {
+        const hasReacted = users.some(u => u.uid === user?.uid);
+        const names = users.map(u => u.name).join(', ');
+        return `
+                    <button class="reaction-btn ${hasReacted ? 'reacted' : ''}" 
+                            data-emoji="${emoji}" data-msg-id="${msgId}" title="${names}">
+                        ${emoji} <span class="reaction-count">${users.length}</span>
+                    </button>
+                `;
+    }).join('')}
+        </div>
+    `;
+}
+
+/**
  * Mesajları render et
  */
 export function renderMessages(messages) {
@@ -115,18 +140,19 @@ export function renderMessages(messages) {
         group.innerHTML = `
             <div class="message ${isCompact ? 'compact' : ''}">
                 ${!isCompact ? `
-                    <div class="message-avatar" style="background: ${avatarColor}">
+                    <div class="message-avatar clickable-user" data-uid="${msg.authorId}" data-uname="${escapeHtml(msg.author)}" style="background: ${avatarColor}">
                         ${msg.avatar || getInitials(msg.author)}
                     </div>
                 ` : ''}
                 <div class="message-body">
                     ${!isCompact ? `
                         <div class="message-header">
-                            <span class="message-author">${escapeHtml(msg.author)}</span>
+                            <span class="message-author clickable-user" data-uid="${msg.authorId}" data-uname="${escapeHtml(msg.author)}">${escapeHtml(msg.author)}</span>
                             <span class="message-timestamp">${time}</span>
                         </div>
                     ` : ''}
                     <div class="message-text">${escapeHtml(msg.text)}${msg.edited ? '<span class="message-edited-tag">(düzenlenmiş)</span>' : ''}</div>
+                    ${renderReactions(msg.reactions, msg.id)}
                 </div>
             </div>
             <div class="message-actions">
@@ -144,6 +170,110 @@ export function renderMessages(messages) {
 
     // En alta kaydır
     container.scrollTop = container.scrollHeight;
+}
+
+/**
+ * Inline edit modunu başlat
+ */
+export function startInlineEdit(messageId) {
+    const messages = getState('messages') || [];
+    const msg = messages.find(m => m.id === messageId);
+    if (!msg) return;
+
+    const group = document.querySelector(`[data-message-id="${messageId}"]`);
+    if (!group) return;
+
+    const textEl = group.querySelector('.message-text');
+    if (!textEl) return;
+
+    const originalText = msg.text;
+    textEl.innerHTML = `
+        <div class="inline-edit-container">
+            <textarea class="inline-edit-input" rows="1">${escapeHtml(originalText)}</textarea>
+            <div class="inline-edit-actions">
+                <span class="inline-edit-hint">Esc ile iptal • Enter ile kaydet</span>
+                <button class="inline-edit-cancel">İptal</button>
+                <button class="inline-edit-save">Kaydet</button>
+            </div>
+        </div>
+    `;
+
+    const textarea = textEl.querySelector('.inline-edit-input');
+    textarea.focus();
+    textarea.selectionStart = textarea.value.length;
+
+    // Auto-resize
+    textarea.style.height = 'auto';
+    textarea.style.height = textarea.scrollHeight + 'px';
+
+    // Kaydet
+    const save = () => {
+        const newText = textarea.value.trim();
+        if (newText && newText !== originalText) {
+            document.dispatchEvent(new CustomEvent('saveEditMessage', {
+                detail: { messageId, newText }
+            }));
+        } else {
+            // İptal - geri yükle
+            textEl.innerHTML = `${escapeHtml(originalText)}${msg.edited ? '<span class="message-edited-tag">(düzenlenmiş)</span>' : ''}`;
+        }
+    };
+
+    const cancel = () => {
+        textEl.innerHTML = `${escapeHtml(originalText)}${msg.edited ? '<span class="message-edited-tag">(düzenlenmiş)</span>' : ''}`;
+    };
+
+    textarea.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); save(); }
+        if (e.key === 'Escape') cancel();
+    });
+
+    textEl.querySelector('.inline-edit-save')?.addEventListener('click', save);
+    textEl.querySelector('.inline-edit-cancel')?.addEventListener('click', cancel);
+}
+
+/**
+ * Emoji picker göster
+ */
+function showEmojiPicker(messageId, anchorEl) {
+    // Mevcut picker'ı kaldır
+    document.querySelector('.emoji-picker-popup')?.remove();
+
+    const picker = document.createElement('div');
+    picker.className = 'emoji-picker-popup';
+    picker.innerHTML = `
+        <div class="emoji-picker-grid">
+            ${QUICK_EMOJIS.map(e => `<button class="emoji-pick-btn" data-emoji="${e}">${e}</button>`).join('')}
+        </div>
+    `;
+
+    // Pozisyon
+    const rect = anchorEl.getBoundingClientRect();
+    picker.style.position = 'fixed';
+    picker.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+    picker.style.left = rect.left + 'px';
+    picker.style.zIndex = '9999';
+
+    document.body.appendChild(picker);
+
+    picker.querySelectorAll('.emoji-pick-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.dispatchEvent(new CustomEvent('addReaction', {
+                detail: { messageId, emoji: btn.dataset.emoji }
+            }));
+            picker.remove();
+        });
+    });
+
+    // Dışarı tıklayınca kapat
+    setTimeout(() => {
+        document.addEventListener('click', function handler(e) {
+            if (!picker.contains(e.target)) {
+                picker.remove();
+                document.removeEventListener('click', handler);
+            }
+        });
+    }, 0);
 }
 
 /**
@@ -224,18 +354,46 @@ function setupChatEvents() {
     // Mesaj aksiyonları (event delegation)
     document.getElementById('messagesArea')?.addEventListener('click', (e) => {
         const actionBtn = e.target.closest('.message-action-btn');
-        if (!actionBtn) return;
+        if (actionBtn) {
+            const messageGroup = actionBtn.closest('.message-group');
+            const messageId = messageGroup?.dataset.messageId;
+            const action = actionBtn.dataset.action;
 
-        const messageGroup = actionBtn.closest('.message-group');
-        const messageId = messageGroup?.dataset.messageId;
-        const action = actionBtn.dataset.action;
-
-        if (action === 'delete' && messageId) {
-            if (confirm('Bu mesajı silmek istediğine emin misin?')) {
-                document.dispatchEvent(new CustomEvent('deleteMessage', { detail: { messageId } }));
+            if (action === 'delete' && messageId) {
+                if (confirm('Bu mesajı silmek istediğine emin misin?')) {
+                    document.dispatchEvent(new CustomEvent('deleteMessage', { detail: { messageId } }));
+                }
+            } else if (action === 'edit' && messageId) {
+                startInlineEdit(messageId);
+            } else if (action === 'react' && messageId) {
+                showEmojiPicker(messageId, actionBtn);
             }
-        } else if (action === 'edit' && messageId) {
-            document.dispatchEvent(new CustomEvent('editMessage', { detail: { messageId } }));
+            return;
+        }
+
+        // Tepki butonlarına tıklama
+        const reactionBtn = e.target.closest('.reaction-btn');
+        if (reactionBtn) {
+            const msgId = reactionBtn.dataset.msgId;
+            const emoji = reactionBtn.dataset.emoji;
+            if (msgId && emoji) {
+                document.dispatchEvent(new CustomEvent('addReaction', {
+                    detail: { messageId: msgId, emoji }
+                }));
+            }
+            return;
+        }
+
+        // Kullanıcı profil kartı tıklama
+        const clickableUser = e.target.closest('.clickable-user');
+        if (clickableUser) {
+            const uid = clickableUser.dataset.uid;
+            const uname = clickableUser.dataset.uname;
+            if (uid) {
+                document.dispatchEvent(new CustomEvent('showProfileCard', {
+                    detail: { uid, displayName: uname, anchorEl: clickableUser }
+                }));
+            }
         }
     });
 }
