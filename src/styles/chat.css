@@ -587,3 +587,115 @@
 .clickable-user:hover {
     filter: brightness(1.1);
 }
+
+/* === Dosya Eki Stilleri === */
+.message-attachment {
+    margin-top: 8px;
+    max-width: 400px;
+}
+
+.message-attachment.file {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+}
+
+.attachment-image {
+    max-width: 100%;
+    max-height: 350px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.attachment-image:hover {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.attachment-image-link {
+    display: block;
+}
+
+.attachment-video {
+    max-width: 100%;
+    max-height: 350px;
+    border-radius: var(--radius-md);
+}
+
+.attachment-audio {
+    width: 100%;
+    height: 40px;
+    border-radius: var(--radius-md);
+}
+
+.attachment-file-icon {
+    font-size: 28px;
+}
+
+.attachment-file-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.attachment-file-name {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent-primary);
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.attachment-file-name:hover {
+    text-decoration: underline;
+}
+
+.attachment-file-size {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.attachment-download-btn {
+    font-size: 20px;
+    text-decoration: none;
+    padding: 4px;
+    border-radius: var(--radius-sm);
+    transition: var(--transition-fast);
+}
+
+.attachment-download-btn:hover {
+    background: var(--bg-hover);
+}
+
+/* === Speaking Avatar Stili === */
+.user-panel-avatar.speaking,
+.message-avatar.speaking {
+    box-shadow: 0 0 0 3px var(--success), 0 0 12px rgba(67, 181, 129, 0.4);
+    animation: speakingPulse 1s infinite;
+}
+
+@keyframes speakingPulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 3px var(--success), 0 0 8px rgba(67, 181, 129, 0.3);
+    }
+
+    50% {
+        box-shadow: 0 0 0 4px var(--success), 0 0 16px rgba(67, 181, 129, 0.5);
+    }
+}
+
+/* === Avatar Image Stili === */
+.avatar-image {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+}

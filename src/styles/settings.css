@@ -330,3 +330,186 @@
         padding: 20px;
     }
 }
+
+/* === Voice Mode Picker === */
+.voice-mode-picker {
+    display: flex;
+    gap: 12px;
+}
+
+.voice-mode-option {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: var(--bg-tertiary);
+    border: 2px solid transparent;
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    transition: var(--transition-fast);
+    color: var(--text-secondary);
+    text-align: left;
+}
+
+.voice-mode-option:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.voice-mode-option.selected {
+    border-color: var(--accent-primary);
+    background: rgba(124, 92, 252, 0.1);
+    color: var(--text-primary);
+}
+
+.voice-mode-icon {
+    font-size: 24px;
+}
+
+.voice-mode-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.voice-mode-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+/* === Sensitivity Slider === */
+.sensitivity-slider-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.sensitivity-slider {
+    flex: 1;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--bg-tertiary);
+    border-radius: 3px;
+    outline: none;
+}
+
+.sensitivity-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent-primary);
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.sensitivity-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+    box-shadow: 0 0 8px rgba(124, 92, 252, 0.4);
+}
+
+.sensitivity-value {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    min-width: 24px;
+    text-align: center;
+}
+
+/* === Toggle Switch === */
+.toggle-switch {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--bg-tertiary);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    left: 3px;
+    bottom: 3px;
+    background: white;
+    border-radius: 50%;
+    transition: var(--transition-fast);
+}
+
+.toggle-switch input:checked+.toggle-slider {
+    background: var(--accent-primary);
+}
+
+.toggle-switch input:checked+.toggle-slider::before {
+    transform: translateX(20px);
+}
+
+/* === PTT Key Badge === */
+.ptt-key-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 14px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-family: monospace;
+}
+
+/* === Setting Description === */
+.setting-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+/* === Profil Resmi Değiştir Butonu === */
+.profile-photo-btn {
+    margin-top: 6px;
+    padding: 5px 12px;
+    border-radius: var(--radius-md);
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--accent-primary);
+    color: white;
+    border: none;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.profile-photo-btn:hover {
+    background: var(--accent-hover);
+    box-shadow: 0 2px 8px rgba(124, 92, 252, 0.3);
+}
+
+.profile-avatar-large .avatar-image {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+}

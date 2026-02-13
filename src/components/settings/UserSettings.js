@@ -24,6 +24,7 @@ export function renderSettings() {
                     <div class="settings-nav-separator"></div>
                     <div class="settings-nav-title">Uygulama Ayarları</div>
                     <button class="settings-nav-item" data-tab="appearance">Görünüm</button>
+                    <button class="settings-nav-item" data-tab="voice">Ses & Video</button>
                     <div class="settings-nav-separator"></div>
                     <button class="settings-nav-item danger" id="settingsLogout">Çıkış Yap</button>
                 </div>
@@ -58,6 +59,7 @@ export function renderSettings() {
             if (tab === 'profile') renderProfileTab();
             else if (tab === 'account') renderAccountTab();
             else if (tab === 'appearance') renderAppearanceTab();
+            else if (tab === 'voice') renderVoiceTab();
         });
     });
 
@@ -92,10 +94,13 @@ function renderProfileTab() {
             <div class="profile-banner"></div>
             <div class="profile-card-body">
                 <div class="profile-avatar-section">
-                    <div class="profile-avatar-large" id="profileAvatar">${user.avatar || '😀'}</div>
+                    <div class="profile-avatar-large" id="profileAvatar">
+                        ${user.photoURL ? `<img src="${user.photoURL}" class="avatar-image" alt="Profil" />` : (user.avatar || '😀')}
+                    </div>
                     <div>
                         <div class="profile-username">${user.displayName}</div>
                         <div class="profile-tag">${user.email}</div>
+                        <button class="profile-photo-btn" id="changeProfilePhoto">📷 Profil Resmi Değiştir</button>
                     </div>
                 </div>
                 
@@ -175,6 +180,41 @@ function renderProfileTab() {
         const newStatus = option.dataset.status;
         await updateUserProfile(user.uid, { status: newStatus });
         setState('user', { ...getState('user'), status: newStatus });
+    });
+
+    // Profil resmi değiştir
+    document.getElementById('changeProfilePhoto')?.addEventListener('click', () => {
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/png,image/jpeg,image/gif,image/webp';
+        fileInput.style.display = 'none';
+        document.body.appendChild(fileInput);
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('Profil resmi 5MB\'ı aşamaz!');
+                    fileInput.remove();
+                    return;
+                }
+                document.dispatchEvent(new CustomEvent('uploadProfileImage', {
+                    detail: { file }
+                }));
+                // Önizleme göster
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const profileAvatar = document.getElementById('profileAvatar');
+                    if (profileAvatar) {
+                        profileAvatar.innerHTML = `<img src="${ev.target.result}" class="avatar-image" alt="Profil" />`;
+                    }
+                };
+                reader.readAsDataURL(file);
+            }
+            fileInput.remove();
+        });
+
+        fileInput.click();
     });
 }
 
@@ -300,6 +340,130 @@ function renderAppearanceTab() {
             </div>
         </div>
     `;
+}
+
+function renderVoiceTab() {
+    const content = document.getElementById('settingsTabContent');
+    if (!content) return;
+
+    const voiceMode = localStorage.getItem('voiceMode') || 'auto';
+    const sensitivity = localStorage.getItem('voiceSensitivity') || '25';
+    const echoCancellation = localStorage.getItem('echoCancellation') !== 'false';
+    const noiseSuppression = localStorage.getItem('noiseSuppression') !== 'false';
+    const autoGainControl = localStorage.getItem('autoGainControl') !== 'false';
+
+    content.innerHTML = `
+        <div class="settings-section-title">Ses & Video</div>
+        
+        <div class="setting-row">
+            <div>
+                <div class="setting-label">Ses Giriş Modu</div>
+                <div class="setting-desc">Mikrofon aktivasyonu yöntemi</div>
+            </div>
+        </div>
+
+        <div class="voice-mode-picker" id="voiceModePicker">
+            <button class="voice-mode-option ${voiceMode === 'auto' ? 'selected' : ''}" data-mode="auto">
+                <span class="voice-mode-icon">🎙️</span>
+                <div>
+                    <div class="voice-mode-title">Ses Aktivasyonu</div>
+                    <div class="voice-mode-desc">Konuştuğunuzda otomatik açılır</div>
+                </div>
+            </button>
+            <button class="voice-mode-option ${voiceMode === 'ptt' ? 'selected' : ''}" data-mode="ptt">
+                <span class="voice-mode-icon">⌨️</span>
+                <div>
+                    <div class="voice-mode-title">Tuşla Yakala</div>
+                    <div class="voice-mode-desc">Tuşa bastığınızda aktif olur</div>
+                </div>
+            </button>
+        </div>
+
+        ${voiceMode === 'auto' ? `
+            <div class="setting-row" style="margin-top: 16px;">
+                <div style="width:100%">
+                    <div class="setting-label">Ses Algılama Eşiği</div>
+                    <div class="setting-desc">Düşük değer = daha hassas algılama</div>
+                    <div class="sensitivity-slider-container">
+                        <span>🔇</span>
+                        <input type="range" class="sensitivity-slider" id="sensitivitySlider" min="5" max="80" value="${sensitivity}" />
+                        <span>🔊</span>
+                        <span class="sensitivity-value" id="sensitivityValue">${sensitivity}</span>
+                    </div>
+                </div>
+            </div>
+        ` : `
+            <div class="setting-row" style="margin-top: 16px;">
+                <div>
+                    <div class="setting-label">Tuşla Yakala Tuşu</div>
+                    <div class="setting-desc">Varsayılan: Space tuşu</div>
+                </div>
+                <kbd class="ptt-key-badge">Space</kbd>
+            </div>
+        `}
+
+        <div class="settings-section-title" style="margin-top: 24px;">Ses İşleme</div>
+        
+        <div class="setting-row">
+            <div>
+                <div class="setting-label">Eko İptali</div>
+                <div class="setting-desc">Hoparlör yankısını engeller</div>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="echoCancelToggle" ${echoCancellation ? 'checked' : ''} />
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+
+        <div class="setting-row">
+            <div>
+                <div class="setting-label">Gürültü Bastırma</div>
+                <div class="setting-desc">Arka plan gürültüsünü azaltır</div>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="noiseSuppressionToggle" ${noiseSuppression ? 'checked' : ''} />
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+
+        <div class="setting-row">
+            <div>
+                <div class="setting-label">Otomatik Kazanç</div>
+                <div class="setting-desc">Ses seviyesini otomatik ayarlar</div>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="autoGainToggle" ${autoGainControl ? 'checked' : ''} />
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+    `;
+
+    // Voice mode seçimi
+    document.getElementById('voiceModePicker')?.addEventListener('click', (e) => {
+        const option = e.target.closest('.voice-mode-option');
+        if (!option) return;
+        const mode = option.dataset.mode;
+        localStorage.setItem('voiceMode', mode);
+        renderVoiceTab(); // Yeniden render
+    });
+
+    // Sensitivity slider
+    document.getElementById('sensitivitySlider')?.addEventListener('input', (e) => {
+        const val = e.target.value;
+        document.getElementById('sensitivityValue').textContent = val;
+        localStorage.setItem('voiceSensitivity', val);
+    });
+
+    // Toggle'lar
+    document.getElementById('echoCancelToggle')?.addEventListener('change', (e) => {
+        localStorage.setItem('echoCancellation', e.target.checked);
+    });
+    document.getElementById('noiseSuppressionToggle')?.addEventListener('change', (e) => {
+        localStorage.setItem('noiseSuppression', e.target.checked);
+    });
+    document.getElementById('autoGainToggle')?.addEventListener('change', (e) => {
+        localStorage.setItem('autoGainControl', e.target.checked);
+    });
 }
 
 export function closeSettings() {

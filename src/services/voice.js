@@ -20,6 +20,10 @@ let screenStream = null;
 let peerConnections = {};
 let voiceUsersUnsubscribe = null;
 let signalingUnsubscribes = {};
+let audioContext = null;
+let analyser = null;
+let speakingInterval = null;
+let isSpeaking = false;
 
 const ICE_SERVERS = {
     iceServers: [
@@ -65,8 +69,12 @@ export async function joinVoiceChannel(serverId, channelId, channelName, user) {
             serverId,
             micEnabled: true,
             speakerEnabled: true,
+            screenSharing: false,
             participants: []
         });
+
+        // Ses algılama başlat (konuşurken avatar ışığı)
+        startSpeakingDetection();
 
         // Diğer kullanıcıları dinle ve bağlantı kur
         if (db) {
@@ -309,6 +317,9 @@ export async function leaveVoiceChannel(user) {
         // Remote audio elementlerini temizle
         document.querySelectorAll('.remote-audio').forEach(el => el.remove());
 
+        // Ses algılamayı durdur
+        stopSpeakingDetection();
+
         // State sıfırla
         setState('voice', {
             connected: false,
@@ -317,6 +328,7 @@ export async function leaveVoiceChannel(user) {
             serverId: null,
             micEnabled: true,
             speakerEnabled: true,
+            screenSharing: false,
             participants: []
         });
         setState('voiceParticipants', []);
@@ -337,6 +349,22 @@ export function toggleMicrophone() {
         if (audioTrack) {
             audioTrack.enabled = !audioTrack.enabled;
             setState('voice.micEnabled', audioTrack.enabled);
+
+            // Firestore'da muted durumunu güncelle
+            const voice = getState('voice');
+            const user = getState('user');
+            if (db && voice?.serverId && voice?.channelId && user?.uid) {
+                setDoc(
+                    doc(db, 'servers', voice.serverId, 'channels', voice.channelId, 'voiceUsers', user.uid),
+                    { muted: !audioTrack.enabled },
+                    { merge: true }
+                ).catch(() => { });
+            }
+
+            // UI güncelle
+            document.dispatchEvent(new CustomEvent('micToggled', {
+                detail: { enabled: audioTrack.enabled }
+            }));
             return audioTrack.enabled;
         }
     }
@@ -355,7 +383,84 @@ export function toggleSpeaker() {
         audio.muted = current; // tersini yap
     });
 
+    // UI güncelle
+    document.dispatchEvent(new CustomEvent('speakerToggled', {
+        detail: { enabled: !current }
+    }));
+
     return !current;
+}
+
+// ============ Ses Algılama (Speaking Detection) ============
+
+/**
+ * Ses algılama başlat - konuşurken avatar ışığı
+ */
+function startSpeakingDetection() {
+    if (!localStream) return;
+
+    try {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 512;
+        analyser.smoothingTimeConstant = 0.4;
+
+        const source = audioContext.createMediaStreamSource(localStream);
+        source.connect(analyser);
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        const THRESHOLD = 25; // Ses eşiği
+        let silentFrames = 0;
+        const SILENT_FRAMES_THRESHOLD = 10; // 10 frame sessizlik = konuşma bitti
+
+        speakingInterval = setInterval(() => {
+            analyser.getByteFrequencyData(dataArray);
+
+            // Ortalama ses seviyesi
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+                sum += dataArray[i];
+            }
+            const average = sum / dataArray.length;
+
+            const wasSpeaking = isSpeaking;
+
+            if (average > THRESHOLD) {
+                isSpeaking = true;
+                silentFrames = 0;
+            } else {
+                silentFrames++;
+                if (silentFrames > SILENT_FRAMES_THRESHOLD) {
+                    isSpeaking = false;
+                }
+            }
+
+            // Durum değiştiyse event gönder
+            if (wasSpeaking !== isSpeaking) {
+                document.dispatchEvent(new CustomEvent('speakingChanged', {
+                    detail: { speaking: isSpeaking, volume: average }
+                }));
+            }
+        }, 50); // 50ms = 20 FPS algılama
+    } catch (e) {
+        console.warn('Ses algılama başlatılamadı:', e);
+    }
+}
+
+/**
+ * Ses algılamayı durdur
+ */
+function stopSpeakingDetection() {
+    if (speakingInterval) {
+        clearInterval(speakingInterval);
+        speakingInterval = null;
+    }
+    if (audioContext) {
+        audioContext.close().catch(() => { });
+        audioContext = null;
+    }
+    analyser = null;
+    isSpeaking = false;
 }
 
 /**

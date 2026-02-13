@@ -89,22 +89,35 @@ export function watchChannels(serverId, callback) {
 // ============ Mesaj İşlemleri ============
 
 /**
- * Mesaj gönder
+ * Mesaj gönder (opsiyonel dosya eki)
  */
-export async function sendMessage(serverId, channelId, user, text) {
-    if (!text.trim()) return;
+export async function sendMessage(serverId, channelId, user, text, attachment = null) {
+    if (!text.trim() && !attachment) return;
 
     try {
+        const msgData = {
+            text: text.trim(),
+            author: user.displayName,
+            authorId: user.uid,
+            avatar: user.avatar,
+            timestamp: serverTimestamp(),
+            edited: false
+        };
+
+        // Dosya eki varsa ekle
+        if (attachment) {
+            msgData.attachment = {
+                url: attachment.url,
+                name: attachment.name,
+                size: attachment.size,
+                type: attachment.type,
+                fileType: attachment.fileType // 'image', 'video', 'audio', 'file'
+            };
+        }
+
         await addDoc(
             collection(db, 'servers', serverId, 'channels', channelId, 'messages'),
-            {
-                text: text.trim(),
-                author: user.displayName,
-                authorId: user.uid,
-                avatar: user.avatar,
-                timestamp: serverTimestamp(),
-                edited: false
-            }
+            msgData
         );
         return { success: true };
     } catch (error) {

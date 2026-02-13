@@ -7,6 +7,56 @@ import { formatTime, formatDate, escapeHtml, getInitials, getAvatarColor } from 
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '🔥', '💀', '😮', '🎉', '💯'];
 
+/**
+ * Dosya eki göster
+ */
+function renderAttachment(att) {
+    if (!att) return '';
+    const { url, name, size, fileType } = att;
+    const sizeText = size ? formatFileSizeSimple(size) : '';
+
+    if (fileType === 'image') {
+        return `
+            <div class="message-attachment">
+                <a href="${url}" target="_blank" class="attachment-image-link">
+                    <img src="${url}" alt="${escapeHtml(name || 'image')}" class="attachment-image" loading="lazy" />
+                </a>
+            </div>
+        `;
+    }
+    if (fileType === 'video') {
+        return `
+            <div class="message-attachment">
+                <video src="${url}" controls class="attachment-video" preload="metadata"></video>
+            </div>
+        `;
+    }
+    if (fileType === 'audio') {
+        return `
+            <div class="message-attachment">
+                <audio src="${url}" controls class="attachment-audio" preload="metadata"></audio>
+            </div>
+        `;
+    }
+    // Genel dosya
+    return `
+        <div class="message-attachment file">
+            <span class="attachment-file-icon">📄</span>
+            <div class="attachment-file-info">
+                <a href="${url}" target="_blank" class="attachment-file-name">${escapeHtml(name || 'Dosya')}</a>
+                <span class="attachment-file-size">${sizeText}</span>
+            </div>
+            <a href="${url}" download="${escapeHtml(name)}" class="attachment-download-btn">⬇️</a>
+        </div>
+    `;
+}
+
+function formatFileSizeSimple(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
 export function renderChatArea(container) {
     container.innerHTML = `
         <div class="main-content">
@@ -151,7 +201,8 @@ export function renderMessages(messages) {
                             <span class="message-timestamp">${time}</span>
                         </div>
                     ` : ''}
-                    <div class="message-text">${escapeHtml(msg.text)}${msg.edited ? '<span class="message-edited-tag">(düzenlenmiş)</span>' : ''}</div>
+                    <div class="message-text">${msg.text ? escapeHtml(msg.text) : ''}${msg.edited ? '<span class="message-edited-tag">(düzenlenmiş)</span>' : ''}</div>
+                    ${renderAttachment(msg.attachment)}
                     ${renderReactions(msg.reactions, msg.id)}
                 </div>
             </div>
@@ -344,6 +395,26 @@ function setupChatEvents() {
         document.dispatchEvent(new CustomEvent('typing', {
             detail: { isTyping: input.value.trim().length > 0 }
         }));
+    });
+    // Dosya ekleme
+    document.getElementById('attachFileBtn')?.addEventListener('click', () => {
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.zip,.rar';
+        fileInput.style.display = 'none';
+        document.body.appendChild(fileInput);
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                document.dispatchEvent(new CustomEvent('uploadFile', {
+                    detail: { file }
+                }));
+            }
+            fileInput.remove();
+        });
+
+        fileInput.click();
     });
 
     // Üye paneli toggle

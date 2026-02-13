@@ -40,6 +40,7 @@ import {
     getDMChatId
 } from '../services/friends.js';
 import { joinVoiceChannel, leaveVoiceChannel, toggleMicrophone, toggleSpeaker, startScreenShare, stopScreenShare, isScreenSharing } from '../services/voice.js';
+import { uploadChatFile, uploadProfileImage, getFileType } from '../services/storage.js';
 import { debounce } from '../utils/helpers.js';
 
 let currentMessageUnsubscribe = null;
@@ -422,7 +423,7 @@ function setupAppEvents() {
     // ====== MESAJ EVENT'LERİ ======
 
     document.addEventListener('sendMessage', async (e) => {
-        const { text } = e.detail;
+        const { text, attachment } = e.detail;
         const serverId = currentServerId || getState('currentServer');
 
         if (appMode === 'friends' && currentDMFriend) {
@@ -431,8 +432,62 @@ function setupAppEvents() {
         } else {
             const channelId = getState('currentChannel');
             if (!channelId) return;
-            await sendMessage(serverId, channelId, user, text);
+            await sendMessage(serverId, channelId, user, text, attachment || null);
             setTypingStatus(serverId, channelId, user.uid, user.displayName, false);
+        }
+    });
+
+    // Dosya yükleme
+    document.addEventListener('uploadFile', async (e) => {
+        const { file } = e.detail;
+        const serverId = currentServerId || getState('currentServer');
+        const channelId = getState('currentChannel');
+        if (!channelId) return;
+
+        // Yükleme göstergesi
+        const input = document.getElementById('messageInput');
+        const origPlaceholder = input?.placeholder || '';
+        if (input) input.placeholder = 'Dosya yükleniyor... 0%';
+
+        const result = await uploadChatFile(file, serverId, channelId, (progress) => {
+            if (input) input.placeholder = `Dosya yükleniyor... ${progress}%`;
+        });
+
+        if (input) input.placeholder = origPlaceholder;
+
+        if (result.success) {
+            const fileType = getFileType(file.name);
+            await sendMessage(serverId, channelId, user, '', {
+                url: result.url,
+                name: file.name,
+                size: file.size,
+                type: file.type,
+                fileType
+            });
+        } else {
+            alert(result.error || 'Dosya yüklenemedi!');
+        }
+    });
+
+    // Profil resmi yükleme
+    document.addEventListener('uploadProfileImage', async (e) => {
+        const { file } = e.detail;
+        const result = await uploadProfileImage(file, user.uid);
+        if (result.success) {
+            // Firestore u kullanıcı dokümanını güncelle
+            const { doc: firestoreDoc, updateDoc } = await import('firebase/firestore');
+            const { db: fbDb } = await import('../config/firebase.js');
+            await updateDoc(firestoreDoc(fbDb, 'users', user.uid), {
+                photoURL: result.url
+            });
+            // Sidebar avatarı güncelle
+            const sidebarAvatar = document.getElementById('sidebarAvatar');
+            if (sidebarAvatar) {
+                sidebarAvatar.innerHTML = `<img src="${result.url}" class="avatar-image" alt="Profil" />`;
+            }
+            setState('user', { ...getState('user'), photoURL: result.url });
+        } else {
+            alert(result.error || 'Profil resmi yüklenemedi!');
         }
     });
 
@@ -523,8 +578,54 @@ function setupAppEvents() {
         if (!result.success) alert(result.error);
     });
 
-    document.addEventListener('toggleMic', () => toggleMicrophone());
-    document.addEventListener('toggleSpeaker', () => toggleSpeaker());
+    document.addEventListener('toggleMic', () => {
+        const enabled = toggleMicrophone();
+        const btn = document.getElementById('micToggleBtn');
+        if (btn) {
+            btn.textContent = enabled ? '🎤' : '🔇';
+            btn.classList.toggle('muted', !enabled);
+        }
+    });
+    document.addEventListener('toggleSpeaker', () => {
+        const enabled = toggleSpeaker();
+        const btn = document.getElementById('speakerToggleBtn');
+        if (btn) {
+            btn.textContent = enabled ? '🔊' : '🔈';
+            btn.classList.toggle('muted', !enabled);
+        }
+    });
+
+    // Konuşurken avatar ışığı
+    document.addEventListener('speakingChanged', (e) => {
+        const { speaking } = e.detail;
+        const avatar = document.getElementById('sidebarAvatar');
+        if (avatar) {
+            avatar.classList.toggle('speaking', speaking);
+        }
+        // Voice room'daki kendi avatar'ımız
+        const myParticipant = document.querySelector('.voice-participant.me');
+        if (myParticipant) {
+            myParticipant.classList.toggle('speaking', speaking);
+        }
+    });
+
+    // Mic toggle event (buton güncelleme)
+    document.addEventListener('micToggled', (e) => {
+        const btn = document.getElementById('micToggleBtn');
+        if (btn) {
+            btn.textContent = e.detail.enabled ? '🎤' : '🔇';
+            btn.classList.toggle('muted', !e.detail.enabled);
+        }
+    });
+
+    // Speaker toggle event
+    document.addEventListener('speakerToggled', (e) => {
+        const btn = document.getElementById('speakerToggleBtn');
+        if (btn) {
+            btn.textContent = e.detail.enabled ? '🔊' : '🔈';
+            btn.classList.toggle('muted', !e.detail.enabled);
+        }
+    });
 
     // Ekran paylaşımı toggle
     document.addEventListener('toggleScreenShare', async () => {
