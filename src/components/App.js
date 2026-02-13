@@ -8,6 +8,7 @@ import { renderSidebar, renderChannels } from './sidebar/Sidebar.js';
 import { renderChatArea, updateChatHeader, renderMessages, updateTypingIndicator } from './chat/ChatArea.js';
 import { renderMemberPanel, updateMembers } from './members/MemberPanel.js';
 import { renderSettings } from './settings/UserSettings.js';
+import { renderFriendPanel, updateFriendContent, updatePendingBadge, showAddFriendResult } from './friends/FriendPanel.js';
 import {
     createDefaultServer,
     watchChannels,
@@ -20,12 +21,28 @@ import {
     setTypingStatus,
     watchTyping
 } from '../services/database.js';
+import {
+    sendFriendRequest,
+    acceptFriendRequest,
+    rejectFriendRequest,
+    watchFriendRequests,
+    watchFriends,
+    sendDirectMessage,
+    watchDirectMessages,
+    getDMChatId
+} from '../services/friends.js';
 import { joinVoiceChannel, leaveVoiceChannel, toggleMicrophone, toggleSpeaker } from '../services/voice.js';
 import { debounce } from '../utils/helpers.js';
 
 let currentMessageUnsubscribe = null;
 let currentTypingUnsubscribe = null;
-let typingTimeout = null;
+let friendRequestsUnsubscribe = null;
+let friendsUnsubscribe = null;
+let dmMessagesUnsubscribe = null;
+
+// Uygulama modu: 'server' veya 'friends'
+let appMode = 'server';
+let currentDMFriend = null;
 
 /**
  * Ana uygulamayı başlat
@@ -74,28 +91,41 @@ export async function renderApp() {
         updateMembers(members);
     });
 
+    // Arkadaş isteklerini dinle
+    friendRequestsUnsubscribe = watchFriendRequests(user.uid, (requests) => {
+        setState('friendRequests', requests);
+        updatePendingBadge(requests.length);
+        if (appMode === 'friends') updateFriendContent();
+    });
+
+    // Arkadaş listesini dinle
+    friendsUnsubscribe = watchFriends(user.uid, (friends) => {
+        setState('friendsList', friends);
+        if (appMode === 'friends') updateFriendContent();
+    });
+
     // Event listener'ları kur
     setupAppEvents();
 }
 
 /**
- * Kanal seç
+ * Kanal seç (sunucu modu)
  */
 function selectChannel(channel) {
+    appMode = 'server';
+    currentDMFriend = null;
     setState('currentChannel', channel.id);
     setState('currentChannelType', channel.type);
+
+    // Chat alanını göster, arkadaş panelini gizle
+    showChatMode();
 
     updateChatHeader(channel.name, channel.description);
 
     const serverId = getState('currentServer');
 
     // Önceki dinleyicileri temizle
-    if (currentMessageUnsubscribe) {
-        currentMessageUnsubscribe();
-    }
-    if (currentTypingUnsubscribe) {
-        currentTypingUnsubscribe();
-    }
+    cleanupMessageListeners();
 
     // Yeni mesajları dinle
     currentMessageUnsubscribe = watchMessages(serverId, channel.id, (messages) => {
@@ -111,6 +141,78 @@ function selectChannel(channel) {
 }
 
 /**
+ * DM aç
+ */
+function openDM(friendUid) {
+    const user = getState('user');
+    const friends = getState('friendsList') || [];
+    const friend = friends.find(f => f.uid === friendUid);
+    if (!friend) return;
+
+    appMode = 'friends';
+    currentDMFriend = friend;
+
+    // Chat alanını göster
+    showChatMode();
+    updateChatHeader(`@${friend.displayName}`, 'Direkt Mesaj');
+
+    // Önceki dinleyicileri temizle
+    cleanupMessageListeners();
+
+    // DM mesajlarını dinle
+    const chatId = getDMChatId(user.uid, friendUid);
+    dmMessagesUnsubscribe = watchDirectMessages(chatId, (messages) => {
+        setState('messages', messages);
+        renderMessages(messages);
+    });
+}
+
+/**
+ * Chat modu - chat alanını göster
+ */
+function showChatMode() {
+    const chatContainer = document.getElementById('chatContainer');
+    const membersContainer = document.getElementById('membersContainer');
+    if (chatContainer) chatContainer.style.display = 'flex';
+    if (membersContainer) membersContainer.style.display = 'flex';
+}
+
+/**
+ * Arkadaş modu - friend panel göster
+ */
+function showFriendsMode() {
+    appMode = 'friends';
+    currentDMFriend = null;
+
+    const chatContainer = document.getElementById('chatContainer');
+    if (chatContainer) {
+        renderFriendPanel(chatContainer);
+    }
+
+    // Members panelini gizle
+    const membersContainer = document.getElementById('membersContainer');
+    if (membersContainer) membersContainer.style.display = 'none';
+}
+
+/**
+ * Mesaj dinleyicilerini temizle
+ */
+function cleanupMessageListeners() {
+    if (currentMessageUnsubscribe) {
+        currentMessageUnsubscribe();
+        currentMessageUnsubscribe = null;
+    }
+    if (currentTypingUnsubscribe) {
+        currentTypingUnsubscribe();
+        currentTypingUnsubscribe = null;
+    }
+    if (dmMessagesUnsubscribe) {
+        dmMessagesUnsubscribe();
+        dmMessagesUnsubscribe = null;
+    }
+}
+
+/**
  * Uygulama event'lerini kur
  */
 function setupAppEvents() {
@@ -123,16 +225,60 @@ function setupAppEvents() {
         selectChannel(channel);
     });
 
+    // ====== ARKADAŞ SİSTEMİ EVENT'LERİ ======
+
+    // Ana sayfa / Arkadaşlar moduna geç
+    document.addEventListener('showFriends', () => {
+        showFriendsMode();
+    });
+
+    // Arkadaş kodu ile istek gönder
+    document.addEventListener('sendFriendRequest', async (e) => {
+        const { code } = e.detail;
+        const result = await sendFriendRequest(user.uid, code);
+        showAddFriendResult(
+            result.success,
+            result.success
+                ? `✅ ${result.targetName}'e arkadaşlık isteği gönderildi!`
+                : `❌ ${result.error}`
+        );
+    });
+
+    // Arkadaşlık isteğini kabul et
+    document.addEventListener('acceptFriendRequest', async (e) => {
+        const { requestId, fromUid } = e.detail;
+        await acceptFriendRequest(requestId, user.uid, fromUid);
+    });
+
+    // Arkadaşlık isteğini reddet
+    document.addEventListener('rejectFriendRequest', async (e) => {
+        const { requestId } = e.detail;
+        await rejectFriendRequest(requestId);
+    });
+
+    // DM aç
+    document.addEventListener('openDM', (e) => {
+        const { friendUid } = e.detail;
+        openDM(friendUid);
+    });
+
+    // ====== MESAJ EVENT'LERİ ======
+
     // Mesaj gönder
     document.addEventListener('sendMessage', async (e) => {
         const { text } = e.detail;
-        const channelId = getState('currentChannel');
-        if (!channelId) return;
 
-        await sendMessage(serverId, channelId, user, text);
-
-        // Yazılıyor durumunu temizle
-        setTypingStatus(serverId, channelId, user.uid, user.displayName, false);
+        if (appMode === 'friends' && currentDMFriend) {
+            // DM mesajı
+            const chatId = getDMChatId(user.uid, currentDMFriend.uid);
+            await sendDirectMessage(chatId, user, text);
+        } else {
+            // Sunucu mesajı
+            const channelId = getState('currentChannel');
+            if (!channelId) return;
+            await sendMessage(serverId, channelId, user, text);
+            setTypingStatus(serverId, channelId, user.uid, user.displayName, false);
+        }
     });
 
     // Mesaj sil
@@ -169,17 +315,20 @@ function setupAppEvents() {
     }, 3000);
 
     document.addEventListener('typing', (e) => {
+        if (appMode !== 'server') return; // DM'de henüz typing yok
         const { isTyping } = e.detail;
         const channelId = getState('currentChannel');
         if (!channelId) return;
 
         if (isTyping) {
             setTypingStatus(serverId, channelId, user.uid, user.displayName, true);
-            typingDebounce(); // 3 saniye sonra otomatik kapat
+            typingDebounce();
         } else {
             setTypingStatus(serverId, channelId, user.uid, user.displayName, false);
         }
     });
+
+    // ====== UI EVENT'LERİ ======
 
     // Üye paneli toggle
     document.addEventListener('toggleMembers', () => {
@@ -199,12 +348,12 @@ function setupAppEvents() {
         renderSettings();
     });
 
-    // Sesli kanala katıl
+    // ====== SESLİ KANAL EVENT'LERİ ======
+
     document.addEventListener('voiceChannelJoin', async (e) => {
         const { id, name } = e.detail;
         const voice = getState('voice');
 
-        // Zaten bağlıysa önce ayrıl
         if (voice.connected) {
             await leaveVoiceChannel(user);
         }
@@ -215,12 +364,10 @@ function setupAppEvents() {
         }
     });
 
-    // Mikrofon toggle
     document.addEventListener('toggleMic', () => {
         toggleMicrophone();
     });
 
-    // Hoparlör toggle
     document.addEventListener('toggleSpeaker', () => {
         toggleSpeaker();
     });

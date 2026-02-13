@@ -15,6 +15,10 @@ export function renderSidebar(container) {
                 <div class="server-indicator"></div>
                 🚀
             </div>
+            <div class="server-icon friends-btn tooltip" data-tooltip="Arkadaşlar" id="friendsBtn">
+                👥
+            </div>
+            <div class="server-separator"></div>
             <div class="server-add tooltip" data-tooltip="Sunucu Ekle" id="addServerBtn">+</div>
         </div>
         
@@ -58,6 +62,7 @@ export function renderSidebar(container) {
                         <span class="user-panel-status online" id="sidebarStatusDot"></span>
                         Çevrimiçi
                     </div>
+                    <div class="user-panel-code" id="sidebarFriendCode" title="Arkadaş kodun"></div>
                 </div>
                 <div class="user-panel-actions">
                     <button class="user-panel-btn" id="settingsBtn" title="Ayarlar">⚙️</button>
@@ -196,15 +201,22 @@ function setupSidebarEvents() {
     document.getElementById('addChannelBtn')?.addEventListener('click', () => {
         document.dispatchEvent(new CustomEvent('createChannel'));
     });
+
+    // Arkadaşlar butonu
+    document.getElementById('friendsBtn')?.addEventListener('click', () => {
+        document.dispatchEvent(new CustomEvent('showFriends'));
+    });
 }
 
 function updateUserPanel(user) {
     if (!user) return;
     const nameEl = document.getElementById('sidebarUserName');
     const avatarEl = document.getElementById('sidebarAvatar');
+    const codeEl = document.getElementById('sidebarFriendCode');
 
     if (nameEl) nameEl.textContent = user.displayName;
     if (avatarEl) avatarEl.textContent = user.avatar || getInitials(user.displayName);
+    if (codeEl && user.friendCode) codeEl.textContent = `#${user.friendCode}`;
 }
 
 function updateVoicePanel(voice) {

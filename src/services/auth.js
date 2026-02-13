@@ -15,7 +15,11 @@ import {
     doc,
     setDoc,
     getDoc,
+    getDocs,
     updateDoc,
+    query,
+    where,
+    collection,
     serverTimestamp
 } from 'firebase/firestore';
 import { setState } from '../utils/state.js';
@@ -33,16 +37,27 @@ export async function register(email, password, displayName, avatar = '😀') {
         // Profil adını güncelle
         await updateProfile(user, { displayName });
 
+        // Benzersiz 4 haneli arkadaş kodu üret
+        const friendCode = await generateUniqueFriendCode();
+
         // Firestore'a kullanıcı bilgisi yaz
         await setDoc(doc(db, 'users', user.uid), {
             uid: user.uid,
             displayName,
             email,
             avatar,
+            friendCode,
             status: 'online',
             bio: '',
+            friends: [],
             createdAt: serverTimestamp(),
             lastSeen: serverTimestamp()
+        });
+
+        // Friend code → uid eşleştirmesi (hızlı arama için)
+        await setDoc(doc(db, 'friendCodes', friendCode), {
+            uid: user.uid,
+            displayName
         });
 
         return { success: true, user };
@@ -69,15 +84,22 @@ export async function login(email, password) {
             });
         } catch (e) {
             // İlk kez giriş yapan kullanıcı Firestore'da olmayabilir
+            const friendCode = await generateUniqueFriendCode();
             await setDoc(doc(db, 'users', userCredential.user.uid), {
                 uid: userCredential.user.uid,
                 displayName: userCredential.user.displayName || 'Kullanıcı',
                 email: userCredential.user.email,
                 avatar: '😀',
+                friendCode,
                 status: 'online',
                 bio: '',
+                friends: [],
                 createdAt: serverTimestamp(),
                 lastSeen: serverTimestamp()
+            });
+            await setDoc(doc(db, 'friendCodes', friendCode), {
+                uid: userCredential.user.uid,
+                displayName: userCredential.user.displayName || 'Kullanıcı'
             });
         }
 
@@ -150,8 +172,10 @@ export function watchAuthState(callback) {
                 email: user.email,
                 displayName: user.displayName || profile?.displayName || 'Kullanıcı',
                 avatar: profile?.avatar || '😀',
+                friendCode: profile?.friendCode || '',
                 status: profile?.status || 'online',
-                bio: profile?.bio || ''
+                bio: profile?.bio || '',
+                friends: profile?.friends || []
             };
             setState('user', userData);
             callback(userData);
@@ -197,4 +221,38 @@ function getAuthErrorMessage(code) {
         'auth/operation-not-allowed': 'E-posta/şifre girişi etkin değil. Firebase Console\'dan aktifleştirin.'
     };
     return messages[code] || `Bir hata oluştu (${code}). Lütfen tekrar deneyin.`;
+}
+
+/**
+ * 4 haneli benzersiz arkadaş kodu üret
+ * Örnek: A7K9, X3M2, B5P1
+ */
+async function generateUniqueFriendCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Karıştırılabilecek karakterler çıkartıldı (0/O, 1/I)
+    let code = '';
+    let attempts = 0;
+
+    while (attempts < 50) {
+        code = '';
+        for (let i = 0; i < 4; i++) {
+            code += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+
+        // Bu kod zaten var mı kontrol et
+        if (db) {
+            const codeDoc = await getDoc(doc(db, 'friendCodes', code));
+            if (!codeDoc.exists()) {
+                return code; // Benzersiz kod bulundu!
+            }
+        } else {
+            return code; // DB yoksa kontrol etmeden dön
+        }
+        attempts++;
+    }
+
+    // 50 denemede benzersiz bulunamazsa 6 haneli üret
+    for (let i = 0; i < 2; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
 }

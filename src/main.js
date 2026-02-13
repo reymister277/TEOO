@@ -13,6 +13,7 @@ import './styles/chat.css';
 import './styles/voice.css';
 import './styles/members.css';
 import './styles/settings.css';
+import './styles/friends.css';
 
 // Modüller
 import { isFirebaseConfigured } from './config/firebase.js';
