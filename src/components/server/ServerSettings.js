@@ -5,6 +5,8 @@
 
 import { getState } from '../../utils/state.js';
 import { getServerInfo } from '../../services/database.js';
+import { db } from '../../config/firebase.js';
+import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import {
     createRole,
     updateRole,
@@ -30,6 +32,7 @@ const PERMISSION_LABELS = {
 
 let currentRoles = [];
 let rolesUnsubscribe = null;
+let rolesLoaded = false;
 
 /**
  * Sunucu ayarları modalını göster
@@ -73,13 +76,22 @@ export async function renderServerSettings(serverId) {
     document.body.appendChild(modal);
 
     // Rolleri dinle
+    rolesLoaded = false;
     rolesUnsubscribe = watchRoles(serverId, (roles) => {
         currentRoles = roles;
+        rolesLoaded = true;
     });
 
     // Varsayılan roller yoksa oluştur
     if (!rolesExist) {
         await createDefaultRoles(serverId, server.ownerId);
+        // Rollerin yüklenmesini bekle
+        await new Promise(resolve => {
+            const check = setInterval(() => {
+                if (rolesLoaded) { clearInterval(check); resolve(); }
+            }, 100);
+            setTimeout(() => { clearInterval(check); resolve(); }, 3000);
+        });
     }
 
     // Tab navigasyonu
@@ -94,7 +106,7 @@ export async function renderServerSettings(serverId) {
             const tab = item.dataset.tab;
             if (tab === 'overview') renderOverviewTab(server, isOwner);
             if (tab === 'roles') renderRolesTab(serverId, isOwner);
-            if (tab === 'members') renderMembersTab(serverId, server);
+            if (tab === 'members') renderMembersTab(serverId);
             if (tab === 'danger') renderDangerTab(serverId);
         });
     });
@@ -290,14 +302,31 @@ function showRoleEditor(serverId, existingRole) {
     });
 }
 
-function renderMembersTab(serverId, server) {
+async function renderMembersTab(serverId) {
     const content = document.getElementById('ssContent');
     if (!content) return;
 
-    const members = getState('members') || [];
+    content.innerHTML = `<div class="ss-section-title">Üyeler yüklüyor...</div>`;
+
+    // Sunucu bilgisini çek
+    const server = await getServerInfo(serverId);
+    if (!server) { content.innerHTML = `<div class="ss-section-title">Sunucu bulunamadı</div>`; return; }
+
+    const memberIds = server.members || [];
     const memberRoles = server.memberRoles || {};
     const user = getState('user');
     const isOwner = server.ownerId === user?.uid;
+
+    // Üyeleri Firestore'dan çek
+    const members = [];
+    for (const uid of memberIds) {
+        try {
+            const userDoc = await getDoc(doc(db, 'users', uid));
+            if (userDoc.exists()) {
+                members.push({ id: uid, ...userDoc.data() });
+            }
+        } catch (e) { /* sessiz */ }
+    }
 
     content.innerHTML = `
         <div class="ss-section-title">Üyeler (${members.length})</div>
@@ -344,14 +373,13 @@ function renderMembersTab(serverId, server) {
             const roleId = select.value;
             if (!roleId) return;
 
-            await assignRole(serverId, uid, roleId);
-            select.value = '';
+            // Butonu devre dışı bırak
+            select.disabled = true;
 
-            // Güncelle
-            const updatedServer = await getServerInfo(serverId);
-            if (updatedServer) {
-                setTimeout(() => renderMembersTab(serverId, updatedServer), 300);
-            }
+            await assignRole(serverId, uid, roleId);
+
+            // Sayfayı yenile
+            setTimeout(() => renderMembersTab(serverId), 300);
         });
     });
 }
