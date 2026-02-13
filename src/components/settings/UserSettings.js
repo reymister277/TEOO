@@ -242,6 +242,20 @@ function renderAccountTab() {
             </div>
         </div>
 
+        <div class="settings-section-title" style="margin-top: 24px;">Kullanıcı Adı Değiştir</div>
+        <div class="profile-card">
+            <div class="profile-card-body" style="padding-top: 24px;">
+                <div class="setting-row" style="flex-direction: column; align-items: stretch;">
+                    <div class="setting-label">Yeni Kullanıcı Adı</div>
+                    <input type="text" id="newDisplayName" class="settings-input" placeholder="${user.displayName}" value="${user.displayName}" maxlength="32" />
+                </div>
+                <div class="setting-row" style="gap: 10px;">
+                    <button class="settings-save-btn" id="changeNameBtn">Adı Kaydet</button>
+                    <div class="settings-status" id="nameStatus"></div>
+                </div>
+            </div>
+        </div>
+
         <div class="settings-section-title" style="margin-top: 24px;">Şifre Değiştir</div>
         <div class="profile-card">
             <div class="profile-card-body" style="padding-top: 24px;">
@@ -274,6 +288,23 @@ function renderAccountTab() {
             </div>
         </div>
     `;
+
+    // Hesap adı değiştirme
+    document.getElementById('changeNameBtn')?.addEventListener('click', () => {
+        const newName = document.getElementById('newDisplayName')?.value;
+        const status = document.getElementById('nameStatus');
+        if (!newName || !newName.trim() || newName.trim().length < 2) {
+            if (status) { status.textContent = 'Ad en az 2 karakter olmalı!'; status.style.color = 'var(--error)'; }
+            return;
+        }
+        if (status) { status.textContent = 'Kaydediliyor...'; status.style.color = 'var(--text-muted)'; }
+        document.dispatchEvent(new CustomEvent('changeDisplayName', {
+            detail: { newName: newName.trim() }
+        }));
+        setTimeout(() => {
+            if (status) { status.textContent = '✅ Ad başarıyla değiştirildi!'; status.style.color = 'var(--success)'; }
+        }, 500);
+    });
 
     // Şifre değiştirme
     document.getElementById('changePasswordBtn')?.addEventListener('click', async () => {

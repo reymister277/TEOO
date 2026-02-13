@@ -284,12 +284,14 @@ function updateVoicePanel(voice) {
 function renderVoiceUser(user) {
     if (!user) return '';
     const color = getAvatarColor(user.displayName || '');
+    const isMuted = user.muted ? '<span class="voice-user-muted">🔇</span>' : '';
     return `
-        <div class="voice-user-item">
+        <div class="voice-user-item" data-uid="${user.uid || ''}">
             <div class="voice-user-avatar" style="background: ${color}">
                 ${user.avatar || getInitials(user.displayName || '')}
             </div>
             <span class="voice-user-name">${user.displayName || ''}</span>
+            ${isMuted}
         </div>
     `;
 }

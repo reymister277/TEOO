@@ -63,6 +63,7 @@ export function renderChatArea(container) {
             <!-- Chat Başlık -->
             <div class="chat-header">
                 <div class="chat-header-left">
+                    <button class="mobile-menu-btn" id="mobileMenuBtn" title="Menü">☰</button>
                     <span class="chat-header-icon">#</span>
                     <span class="chat-header-name" id="chatChannelName">genel</span>
                     <div class="chat-header-divider"></div>

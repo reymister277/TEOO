@@ -312,3 +312,38 @@
         opacity: 1;
     }
 }
+
+/* === Voice User Speaking Glow === */
+.voice-user-item.speaking .voice-user-avatar {
+    box-shadow: 0 0 0 3px var(--success), 0 0 10px rgba(67, 181, 129, 0.4);
+    animation: voiceSpeakPulse 1s infinite;
+}
+
+@keyframes voiceSpeakPulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 2px var(--success), 0 0 6px rgba(67, 181, 129, 0.3);
+    }
+
+    50% {
+        box-shadow: 0 0 0 4px var(--success), 0 0 14px rgba(67, 181, 129, 0.5);
+    }
+}
+
+.voice-user-muted {
+    font-size: 12px;
+    margin-left: auto;
+    opacity: 0.6;
+}
+
+/* Disconnect butonu */
+.voice-control-btn.disconnect {
+    background: var(--error);
+    color: white;
+}
+
+.voice-control-btn.disconnect:hover {
+    background: #d63636;
+    box-shadow: 0 0 8px rgba(240, 71, 71, 0.4);
+}

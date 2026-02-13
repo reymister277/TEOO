@@ -8,6 +8,7 @@ import { renderSidebar, renderChannels, updateServerList } from './sidebar/Sideb
 import { renderChatArea, updateChatHeader, renderMessages, updateTypingIndicator, startInlineEdit } from './chat/ChatArea.js';
 import { renderMemberPanel, updateMembers } from './members/MemberPanel.js';
 import { renderSettings } from './settings/UserSettings.js';
+import { updateUserProfile } from '../services/auth.js';
 import { renderFriendPanel, updateFriendContent, updatePendingBadge, showAddFriendResult } from './friends/FriendPanel.js';
 import { renderHomePage } from './home/HomePage.js';
 import { renderServerModal, showServerSuccess, showModalError } from './server/ServerModal.js';
@@ -474,12 +475,8 @@ function setupAppEvents() {
         const { file } = e.detail;
         const result = await uploadProfileImage(file, user.uid);
         if (result.success) {
-            // Firestore u kullanıcı dokümanını güncelle
-            const { doc: firestoreDoc, updateDoc } = await import('firebase/firestore');
-            const { db: fbDb } = await import('../config/firebase.js');
-            await updateDoc(firestoreDoc(fbDb, 'users', user.uid), {
-                photoURL: result.url
-            });
+            // Firestore kullanıcı dokümanını güncelle
+            await updateUserProfile(user.uid, { photoURL: result.url });
             // Sidebar avatarı güncelle
             const sidebarAvatar = document.getElementById('sidebarAvatar');
             if (sidebarAvatar) {
@@ -488,6 +485,21 @@ function setupAppEvents() {
             setState('user', { ...getState('user'), photoURL: result.url });
         } else {
             alert(result.error || 'Profil resmi yüklenemedi!');
+        }
+    });
+
+    // Hesap adı değiştirme
+    document.addEventListener('changeDisplayName', async (e) => {
+        const { newName } = e.detail;
+        if (!newName || !newName.trim()) return;
+        const result = await updateUserProfile(user.uid, { displayName: newName.trim() });
+        if (result.success) {
+            setState('user', { ...getState('user'), displayName: newName.trim() });
+            // Sidebar güncelle
+            const sidebarName = document.getElementById('sidebarUserName');
+            if (sidebarName) sidebarName.textContent = newName.trim();
+        } else {
+            alert(result.error || 'Ad değiştirilemedi!');
         }
     });
 
@@ -607,6 +619,11 @@ function setupAppEvents() {
         if (myParticipant) {
             myParticipant.classList.toggle('speaking', speaking);
         }
+        // Sidebar'daki ses kanalı kullanıcı listesinde kendi ikonumuz
+        const myVoiceUser = document.querySelector(`.voice-user-item[data-uid="${user.uid}"]`);
+        if (myVoiceUser) {
+            myVoiceUser.classList.toggle('speaking', speaking);
+        }
     });
 
     // Mic toggle event (buton güncelleme)
@@ -670,5 +687,65 @@ function setupAppEvents() {
         const serverId = currentServerId || getState('currentServer');
         const result = await createChannel(serverId, name, type, description);
         if (!result.success) alert('Kanal oluşturulamadı: ' + result.error);
+    });
+
+    // ====== MOBİL SIDEBAR TOGGLE ======
+    setupMobileSidebar();
+}
+
+/**
+ * Mobil sidebar açma/kapama sistemi
+ */
+function setupMobileSidebar() {
+    // Overlay oluştur
+    let overlay = document.querySelector('.mobile-sidebar-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.className = 'mobile-sidebar-overlay';
+        document.body.appendChild(overlay);
+    }
+
+    const sidebar = document.getElementById('sidebarContainer');
+    const members = document.getElementById('membersContainer');
+
+    // Hamburger menü — sidebar aç
+    document.getElementById('mobileMenuBtn')?.addEventListener('click', () => {
+        sidebar?.classList.toggle('mobile-open');
+        overlay.classList.toggle('active', sidebar?.classList.contains('mobile-open'));
+        // Members paneli kapat
+        members?.classList.remove('mobile-open');
+    });
+
+    // Overlay'a tıklayınca hepsini kapat
+    overlay.addEventListener('click', () => {
+        sidebar?.classList.remove('mobile-open');
+        members?.classList.remove('mobile-open');
+        overlay.classList.remove('active');
+    });
+
+    // Üye paneli toggle — mobilde overlay
+    document.addEventListener('toggleMembers', () => {
+        if (window.innerWidth <= 768) {
+            members?.classList.toggle('mobile-open');
+            overlay.classList.toggle('active', members?.classList.contains('mobile-open'));
+            sidebar?.classList.remove('mobile-open');
+        }
+    });
+
+    // Kanal seçilince sidebar kapat (mobil)
+    document.addEventListener('selectChannel', () => {
+        if (window.innerWidth <= 768) {
+            sidebar?.classList.remove('mobile-open');
+            overlay.classList.remove('active');
+        }
+    });
+
+    // ESC ile kapat
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && window.innerWidth <= 768) {
+            sidebar?.classList.remove('mobile-open');
+            members?.classList.remove('mobile-open');
+            overlay.classList.remove('active');
+        }
     });
 }
