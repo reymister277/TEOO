@@ -98,18 +98,25 @@
         box-shadow: -4px 0 20px rgba(0, 0, 0, 0.5);
     }
 
-    /* Chat header kompakt */
+    /* Chat header - Sticky */
     .chat-header {
         padding: 0 12px !important;
+        position: sticky !important;
+        top: 0;
+        z-index: 10;
+        background: rgba(17, 19, 24, 0.95);
+        backdrop-filter: blur(10px);
     }
 
     .chat-header-info h3 {
         font-size: 14px !important;
     }
 
-    /* Chat mesajları */
+    /* Chat mesajları - Input payı bırak */
     .messages-container {
         padding: 8px !important;
+        padding-bottom: 80px !important;
+        /* Input yüksekliği kadar boşluk */
     }
 
     .message-item {
@@ -123,9 +130,16 @@
         font-size: 14px !important;
     }
 
-    /* Mesaj input */
+    /* Mesaj input - Fixed Bottom */
     .message-input-container {
         padding: 8px 12px !important;
+        position: fixed !important;
+        bottom: 0;
+        left: 0;
+        width: 100% !important;
+        background: var(--bg-primary);
+        z-index: 20;
+        border-top: 1px solid var(--border);
     }
 
     .message-input-wrapper {

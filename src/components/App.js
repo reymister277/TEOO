@@ -456,17 +456,36 @@ function setupAppEvents() {
 
         if (input) input.placeholder = origPlaceholder;
 
+        const fileType = getFileType(file.name);
+
         if (result.success) {
-            const fileType = getFileType(file.name);
             await sendMessage(serverId, channelId, user, '', {
                 url: result.url,
                 name: file.name,
                 size: file.size,
-                type: file.type,
+                type: file.type || fileType, // type yoksa uzantıdan al
                 fileType
             });
         } else {
-            alert(result.error || 'Dosya yüklenemedi!');
+            // Eğer yükleme başarısızsa ve dosya resimse, Base64 fallback dene
+            if (fileType === 'image') {
+                try {
+                    const base64 = await resizeImageToBase64(file, 800); // Sohbet için biraz daha büyük (800px)
+                    await sendMessage(serverId, channelId, user, '', {
+                        url: base64,
+                        name: file.name,
+                        size: file.size,
+                        type: 'image/webp', // Base64 dönüşümü webp
+                        fileType: 'image'
+                    });
+                    console.log('Resim Base64 olarak gönderildi (Storage hatası nedeniyle)');
+                } catch (err) {
+                    console.error('Base64 fallback hatası:', err);
+                    alert(result.error || 'Dosya yüklenemedi!');
+                }
+            } else {
+                alert(result.error || 'Dosya yüklenemedi! Sadece resimler sunucusuz gönderilebilir.');
+            }
         }
     });
 
